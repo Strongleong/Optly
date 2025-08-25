@@ -48,6 +48,7 @@ Flag parse_flag(char *arg, Flag *flags) {
 static Flag global_flags[] = {
   { "help",    'h' },
   { "version", 'v' },
+  { "ass", 'a' },
   NULL_FLAG
 };
 
@@ -113,14 +114,37 @@ void parse_args(int argc, char *argv[], Args *args) {
 
   arg = SHIFT_ARR(argv, argc);
 
+  // TODO: Come up with better way of handling batched short args
   while (arg && arg[0] == '-') {
-    Flag flag = parse_flag(arg, global_flags);
+    bool is_batch_short_args = arg[1] != '-' && strlen(arg) > 2;
 
-    if (is_flag_null(&flag)) {
-      fprintf(stderr, "Unknow argument '%s': skipping\n", arg);
+    if (is_batch_short_args) {
+      for (char *c = &arg[1]; *c != '\0'; c++) {
+        char sarg[3];
+        sprintf(sarg, "-%c", *c);
+
+        // Copy pased start
+        Flag flag = parse_flag(sarg, global_flags);
+
+        if (is_flag_null(&flag)) {
+          fprintf(stderr, "Unknow argument '%s': skipping\n", sarg);
+        } else {
+          args->flags[count] = flag;
+          count++;
+        }
+        // Copy pased end
+      }
     } else {
-      args->flags[count] = flag;
-      count++;
+      // Copy pased start
+      Flag flag = parse_flag(arg, global_flags);
+
+      if (is_flag_null(&flag)) {
+        fprintf(stderr, "Unknow argument '%s': skipping\n", arg);
+      } else {
+        args->flags[count] = flag;
+        count++;
+      }
+      // Copy pased end
     }
 
     arg = SHIFT_ARR(argv, argc);
