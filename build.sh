@@ -88,4 +88,4 @@ if $VERBOSE; then
   set -x
 fi
 
-$CC  $CFLAGS $CSTD $CLIBS -o "$OUTDIR/$PROGNAME" $sources
+$CC  $CFLAGS $CSTD $CLIBS -o "$OUTDIR/$PROGNAME" $sources ./lib/libs.c
