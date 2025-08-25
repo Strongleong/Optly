@@ -3,11 +3,14 @@
 #include <stdbool.h>
 #include <string.h>
 
- // if you need more than 512 args for ONE command you should look in the mirror really deep
+#define SHIFT_ARR(arr, len) *(arr)++; (len)--
+
+// if you need more than 512 args for ONE command you should look in the mirror really deep
 #define COMMAND_FLAGS_MAX_COUNT 512
+#define MAX_PATH_LENGTH 4096
 
 typedef struct OrbitaDlConfig {
-  const char *const domain;
+  char const *const domain;
 } OrbitaDlConfig;
 
 /* static OrbitaDlConfig defaut_config = { */
@@ -15,14 +18,31 @@ typedef struct OrbitaDlConfig {
 /* }; */
 
 typedef struct Flag {
-  const char *const fullname;
-  const char shortname;
+  char *fullname;
+  char shortname;
 } Flag;
 
 #define NULL_FLAG { NULL, 0 }
 
 inline bool is_flag_null(Flag *flag) {
   return flag->fullname == NULL && flag->shortname == 0;
+}
+
+inline bool is_flag(char const *const arg, Flag flag) {
+  bool is_short = arg[1] != '-';
+
+  return (!is_short && (strcmp(arg+2, flag.fullname) == 0)) ||
+  (is_short && (arg[1] == flag.shortname));
+}
+
+Flag parse_flag(char *arg, Flag *flags) {
+  for (Flag *flag = flags; !is_flag_null(flag); flag++) {
+    if (is_flag(arg, *flag)) {
+      return *flag;
+    }
+  }
+
+  return (Flag)NULL_FLAG;
 }
 
 static Flag global_flags[] = {
@@ -32,20 +52,21 @@ static Flag global_flags[] = {
 };
 
 typedef struct Command {
-  const char *const name;
+  char const *const name;
   Flag flags[COMMAND_FLAGS_MAX_COUNT];
 } Command;
 
-#define NULL_COMMAND { NULL, NULL_FLAG }
+#define NULL_COMMAND { NULL, { NULL_FLAG } }
 
 inline bool is_command_null(Command *command) {
   return command->name == NULL && is_flag_null(command->flags);
 }
 
 typedef struct Args {
-  const char *const bin_name;
+  char bin_name[MAX_PATH_LENGTH];
   Command command;
   Flag *flags;
+  size_t flags_count;
 } Args;
 
 static Command commands[] = {
@@ -85,51 +106,44 @@ void usage() {
 
 void parse_args(int argc, char *argv[], Args *args) {
   assert(argc > 0);
-  char *arg = *argv++; argc++;
-  arg = *argv++; argc++;
-  /* char *tmp = ""; */
+  char *arg = SHIFT_ARR(argv, argc);
+
+  strcpy(args->bin_name, arg);
+  size_t count = 0;
+
+  arg = SHIFT_ARR(argv, argc);
 
   while (arg && arg[0] == '-') {
-    bool is_short = false;
+    Flag flag = parse_flag(arg, global_flags);
 
-    if (arg[1] == '-') {
-      is_short = true;
+    if (is_flag_null(&flag)) {
+      fprintf(stderr, "Unknow argument '%s': skipping\n", arg);
+    } else {
+      args->flags[count] = flag;
+      count++;
     }
 
-    memmove(arg, arg + (is_short ? 0 : 1), sizeof(arg) - (is_short ? 0 : 1) );
-    printf("%s (0x%02X)\n", arg, arg[0]);
-
-    for (Flag *flag = global_flags; !is_flag_null(flag); flag++) {
-      printf("%c (0x%02X)\n", flag->shortname, flag->shortname);
-      if (
-        (!is_short && strcmp(arg, flag->fullname) == 0) ||
-        (is_short && arg[0] == flag->shortname)
-      ) {
-        printf("Found arg %s", flag->fullname);
-        args->flags = flag;
-        args->flags++;
-        break;
-      }
-
-      /* fprintf(stderr, "Unknow argument '%s': skipping\n", arg); */
-    }
-
-    /* if (strcmp(arg, flag->fullname) == 0 || strcmp(arg, flag->shortname) == ) { */
-    /* } */
-
-    arg = *argv++; argc++;
+    arg = SHIFT_ARR(argv, argc);
   }
 
-  /* *(args->flags) = (Flag)NULL_FLAG; */
+  args->flags[count] = (Flag)NULL_FLAG;
+  args->flags_count = count;
 }
 
 int main(int argc, char *argv[]) {
-  Flag flags[COMMAND_FLAGS_MAX_COUNT];
-  Args args = {};
+  Flag flags[COMMAND_FLAGS_MAX_COUNT] = {0};
+  Args args = {0};
   args.flags = flags;
 
   parse_args(argc, argv, &args);
-  usage();
+  /* usage(); */
+
+  printf("bin_name = %s\n", args.bin_name);
+  printf("flags_count = %zu\n", args.flags_count);
+
+  for (Flag *flag = flags; !is_flag_null(flag); flag++) {
+    printf("flag: %s\n", flag->fullname);
+  }
 
   return 0;
 }
