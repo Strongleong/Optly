@@ -286,4 +286,4 @@ CLIDEF CliArgs cli_parse_args(int argc, char *argv[], CliFlag *flags, CliCommand
 
 // TODO: Add sub-commands
 // TODO: Add positional arguments
-// TODO: Add... I forgor -_-
+// TODO: Add marker for required flag
