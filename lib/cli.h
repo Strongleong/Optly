@@ -1,5 +1,5 @@
 /*
-    cliargs.h - Single-header CLI arguments parser
+    cliargs.h - v0.0.0 - Single-header CLI arguments parser
     STB-style: include this header, then define CLIARGS_IMPLEMENTATION in ONE .c file
 
     Usage:
@@ -285,3 +285,5 @@ CLIDEF CliArgs cli_parse_args(int argc, char *argv[], CliFlag *flags, CliCommand
 #endif // CLIARGS_IMPLEMENTATION
 
 // TODO: Add sub-commands
+// TODO: Add positional arguments
+// TODO: Add... I forgor -_-

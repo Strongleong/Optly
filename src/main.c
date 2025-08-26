@@ -1,9 +1,9 @@
 #include <cli.h>
 #include <stdio.h>
 
-typedef struct OrbitaDlConfig {
-  char const *const domain;
-} OrbitaDlConfig;
+/* typedef struct OrbitaDlConfig { */
+/*   char const *const domain; */
+/* } OrbitaDlConfig; */
 
 /* static OrbitaDlConfig defaut_config = { */
 /*   .domain = "sasflix.ru" */
@@ -12,7 +12,6 @@ typedef struct OrbitaDlConfig {
 static CliFlag global_flags[] = {
   { "help",    'h', NULL },
   { "version", 'v', NULL },
-  { "count",   'c', NULL },
   NULL_FLAG,
 };
 
@@ -22,15 +21,16 @@ static CliFlag download_flags[] = {
 };
 
 static CliCommand commands[] = {
+  { "help", NULL_FLAG },
   { "download", {download_flags} },
   NULL_COMMAND,
 };
 
 int main(int argc, char *argv[]) {
   CliArgs args = cli_parse_args(argc, argv, global_flags, commands);
-  cli_usage(args.bin_name, commands, global_flags);
+  cli_usage(args.bin_path, commands, global_flags);
 
-  printf("Binary: %s\n", args.bin_name);
+  printf("Binary: %s\n", args.bin_path);
 
   if (args.command) {
     printf("Command: %s\n", args.command->name);
