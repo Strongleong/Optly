@@ -66,7 +66,7 @@ typedef struct {
  * Represents parsed CLI arguments (binary name, command, flags).
  */
 typedef struct {
-    char      bin_name[MAX_PATH_LENGTH];           ///< Name of the executable
+    char      bin_path[MAX_PATH_LENGTH];           ///< Name of the executable
     CliCommand *command;                           ///< Detected command
     CliFlag   *parsed_flags[MAX_FLAGS_LENGTH];     ///< Array of parsed flags termitaed by NULL_COMMAND macro
     size_t     parsed_flags_count;                 ///< Count of parsed flags
@@ -81,13 +81,13 @@ CLIDEF CliArgs cli_parse_args(int argc, char *argv[], CliFlag *flags, CliCommand
 /**
  * Print usage message with commands and global flags.
  */
-CLIDEF void cli_usage(char const *const bin_name, CliCommand *commands, CliFlag *flags);
+CLIDEF void cli_usage(char const *const bin_path, CliCommand *commands, CliFlag *flags);
 
 
 /**
  * Print usage message for a specific command.
  */
-CLIDEF void cli_command_usage(char const *const bin_name, CliCommand *command);
+CLIDEF void cli_command_usage(char const *const bin_path, CliCommand *command);
 
 #endif // CLIARGS_H
 
@@ -131,15 +131,19 @@ static CLIDEF void cli__usage_flags(CliFlag **flags) {
     }
 }
 
-CLIDEF void cli_command_usage(char const *const bin_name, CliCommand *command) {
-  char name[strlen(bin_name) + 1];
-  strcpy(name, bin_name);
+CLIDEF void cli_command_usage(char const *const bin_path, CliCommand *command) {
+  // NOTE: Copying const path into non-const path bause of libgen basename
+  char name[strlen(bin_path) + 1];
+  strcpy(name, bin_path);
   fprintf(stderr, "%s [FLAGS] %s [COMMAND FLAGS]\n", basename(name), command->name);
   cli__usage_flags(command->flags);
 }
 
-CLIDEF void cli_usage(char const *const bin_name, CliCommand *commands, CliFlag *flags) {
-  fprintf(stderr, "%s [FLAGS] <COMMAND> [COMMAND FLAGS]\n", bin_name);
+CLIDEF void cli_usage(char const *const bin_path, CliCommand *commands, CliFlag *flags) {
+  // NOTE: Copying const path into non-const path bause of libgen basename
+  char name[strlen(bin_path) + 1];
+  strcpy(name, bin_path);
+  fprintf(stderr, "%s [FLAGS] <COMMAND> [COMMAND FLAGS]\n", basename(name));
   cli__usage_commands_list(commands);
   cli__usage_flags(&flags);
 }
@@ -256,7 +260,7 @@ CLIDEF CliArgs cli_parse_args(int argc, char *argv[], CliFlag *flags, CliCommand
     assert(argc > 0);
 
     CliArgs args = {0};
-    strcpy(args.bin_name, argv[0]);
+    strcpy(args.bin_path, argv[0]);
     SHIFT_ARG(argv, argc);
 
     while (argc > 0) {
