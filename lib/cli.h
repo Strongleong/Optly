@@ -134,12 +134,12 @@ static CLIDEF void cli__usage_flags(CliFlag **flags) {
 CLIDEF void cli_command_usage(char const *const bin_name, CliCommand *command) {
   char name[strlen(bin_name) + 1];
   strcpy(name, bin_name);
-  fprintf(stderr, "%s [GLOBAL FLAGS] %s [COMMAND FLAGS]\n", basename(name), command->name);
+  fprintf(stderr, "%s [FLAGS] %s [COMMAND FLAGS]\n", basename(name), command->name);
   cli__usage_flags(command->flags);
 }
 
 CLIDEF void cli_usage(char const *const bin_name, CliCommand *commands, CliFlag *flags) {
-  fprintf(stderr, "%s [GLOBAL FLAGS] <COMMAND> [COMMAND FLAGS]\n", bin_name);
+  fprintf(stderr, "%s [FLAGS] <COMMAND> [COMMAND FLAGS]\n", bin_name);
   cli__usage_commands_list(commands);
   cli__usage_flags(&flags);
 }
