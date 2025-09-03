@@ -1,2 +1,2 @@
-#define CLIARGS_IMPLEMENTATION
-#include "./cli.h"
+#define OPTLYARGS_IMPLEMENTATION
+#include "./optly.h"

@@ -89,3 +89,4 @@ if $VERBOSE; then
 fi
 
 $CC  $CFLAGS $CSTD $CLIBS -o "$OUTDIR/$PROGNAME" $sources ./lib/libs.c
+$CC  $CFLAGS $CSTD $CLIBS -o "$OUTDIR/tests" ./tests/test.c

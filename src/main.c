@@ -1,34 +1,28 @@
-#include <cli.h>
+#include <optly.h>
 #include <stdio.h>
 
-/* typedef struct OrbitaDlConfig { */
-/*   char const *const domain; */
-/* } OrbitaDlConfig; */
-
-/* static OrbitaDlConfig defaut_config = { */
-/*   .domain = "sasflix.ru" */
-/* }; */
-
-static CliFlag global_flags[] = {
-  { "help",    'h', NULL },
-  { "version", 'v', NULL },
+static OptlyFlag global_flags[] = {
+  { "help",    'h', {false}, OPTLY_TYPE_BOOL },
+  { "version", 'v', {false}, OPTLY_TYPE_BOOL },
+  { "ass",     'a', {NULL},  OPTLY_TYPE_UINT8 },
   NULL_FLAG,
 };
 
-static CliFlag download_flags[] = {
-  { "url", 'u' , NULL },
+static OptlyFlag download_flags[] = {
+  { "url", 'u' , {NULL}, OPTLY_TYPE_STRING },
   NULL_FLAG,
 };
 
-static CliCommand commands[] = {
-  { "help", NULL_FLAG },
+static OptlyCommand commands[] = {
+  { "help",  { NULL }  },
   { "download", {download_flags} },
   NULL_COMMAND,
 };
 
 int main(int argc, char *argv[]) {
-  CliArgs args = cli_parse_args(argc, argv, global_flags, commands);
-  cli_usage(args.bin_path, commands, global_flags);
+  OptlyArgs args = optly_parse_args(argc, argv, global_flags, commands);
+
+  /* optly_usage(args.bin_path, commands, global_flags); */
 
   printf("Binary: %s\n", args.bin_path);
 
@@ -36,9 +30,8 @@ int main(int argc, char *argv[]) {
     printf("Command: %s\n", args.command->name);
   }
 
-  for (size_t i = 0; i < args.parsed_flags_count; i++) {
-    CliFlag *f = args.parsed_flags[i];
-    printf("Flag: --%s (-%c) = %s\n", f->fullname, f->shortname, f->value ? f->value : "TRUE");
+  for (OptlyFlag *f = global_flags; !optly_is_flag_null(f); f++) {
+    printf("Flag: --%s (-%c) = %s\n", f->fullname, f->shortname, f->value.as_bool ? "true" : "false");
   }
 
   return 0;
