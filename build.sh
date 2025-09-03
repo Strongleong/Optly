@@ -1,7 +1,6 @@
 #!/bin/sh
 
 
-PROGNAME=$(basename $(pwd))
 CFLAGS="-Wall -Wextra -std=c99"
 CLIBS="-I./lib/"
 CDEBUG="-O0 -ggdb -fsanitize=address -fno-omit-frame-pointer"
@@ -82,11 +81,10 @@ else
   CFLAGS="$CFLAGS $CRELEASE"
 fi
 
-sources=$(find ./src -name '*.c')
+sources=$(find ./tests -name '*.c')
 
 if $VERBOSE; then
   set -x
 fi
 
-$CC  $CFLAGS $CSTD $CLIBS -o "$OUTDIR/$PROGNAME" $sources ./lib/libs.c
-$CC  $CFLAGS $CSTD $CLIBS -o "$OUTDIR/tests" ./tests/test.c
+$CC  $CFLAGS $CSTD $CLIBS -o "$OUTDIR/tests" $sources ./lib/libs.c
