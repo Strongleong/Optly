@@ -2,7 +2,7 @@
 
 
 CFLAGS="-Wall -Wextra -std=c99"
-CLIBS="-I./lib/"
+CLIBS="-I./"
 CDEBUG="-O0 -ggdb -fsanitize=address -fno-omit-frame-pointer"
 CPROFILE="-pg"
 CRELEASE="-O3 -march=native"
@@ -81,10 +81,23 @@ else
   CFLAGS="$CFLAGS $CRELEASE"
 fi
 
-sources=$(find ./tests -name '*.c')
+tests=$(find ./tests -name '*.c')
+examples=$(find ./examples -name '*.c')
+
+for example in $examples; do
+  CMD="$CC $CFLAGS $CLIBS -o $OUTDIR/$(basename ${example%.*}) $example"
+
+  if $VERBOSE; then
+    echo + $CMD
+  fi
+
+  if $COMPILE; then
+    $CMD &
+  fi
+done
 
 if $VERBOSE; then
   set -x
 fi
 
-$CC  $CFLAGS $CSTD $CLIBS -o "$OUTDIR/tests" $sources ./lib/libs.c
+$CC  $CFLAGS $CSTD $CLIBS -o "$OUTDIR/tests" $tests

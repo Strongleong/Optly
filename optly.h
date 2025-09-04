@@ -42,7 +42,6 @@
 #define MAX_PATH_LENGTH  4096
 
 typedef enum OptlyFlagType {
-    OPTLY_TYPE_PTR,
     OPTLY_TYPE_BOOL,
     OPTLY_TYPE_CHAR,
     OPTLY_TYPE_STRING,
@@ -56,6 +55,7 @@ typedef enum OptlyFlagType {
     OPTLY_TYPE_UINT64,
     OPTLY_TYPE_FLOAT,
     OPTLY_TYPE_DOUBLE,
+    /* OPTLY_TYPE_PTR, */
 } OptlyFlagType;
 
 typedef union OtplyFlagValue {
@@ -216,7 +216,6 @@ static OPTLYDEF bool optly__flag_set_value(OptlyFlag *flag, char *value) {
     flag->value.as_int64 = 0;
 
     switch (flag->type) {
-        case OPTLY_TYPE_PTR:    flag->value.as_ptr    = value; break;
         case OPTLY_TYPE_CHAR:   flag->value.as_char   = *value; break;
         case OPTLY_TYPE_STRING: flag->value.as_string = value; break;
         case OPTLY_TYPE_INT8:   flag->value.as_int8   = atoll(value); break;
@@ -229,6 +228,7 @@ static OPTLYDEF bool optly__flag_set_value(OptlyFlag *flag, char *value) {
         case OPTLY_TYPE_UINT64: flag->value.as_uint64 = atoll(value); break;
         case OPTLY_TYPE_FLOAT:  flag->value.as_float  = atof(value); break;
         case OPTLY_TYPE_DOUBLE: flag->value.as_double = atof(value); break;
+        /* case OPTLY_TYPE_PTR:    flag->value.as_ptr    = value; break; */
 
         case OPTLY_TYPE_BOOL: {
             if (!value) {
@@ -409,8 +409,13 @@ OPTLYDEF OptlyArgs optly_parse_args(int argc, char *argv[], OptlyFlag *flags, Op
             break;
         }
 
+
         if (arg[0] == '-') {
-            optly__parse_flags(&argv, &argc, flags);
+            if (args.command) {
+                optly__parse_flags(&argv, &argc, *args.command->flags);
+            } else {
+                optly__parse_flags(&argv, &argc, flags);
+            }
         } else {
             optly__parse_command(arg, &args, commands);
         }
@@ -427,3 +432,5 @@ OPTLYDEF OptlyArgs optly_parse_args(int argc, char *argv[], OptlyFlag *flags, Op
 // TODO: Add positional arguments
 // TODO: Add marker for required flag
 // TODO: Add ability to ignore unknown flags
+// TODO: Add descriptions for usage
+// TODO: Come up with a way to get a flag by its name
