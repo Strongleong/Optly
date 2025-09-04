@@ -430,7 +430,6 @@ OPTLYDEF OptlyArgs optly_parse_args(int argc, char *argv[], OptlyFlag *flags, Op
 
 // TODO: Add sub-commands
 // TODO: Add positional arguments
-// TODO: Add marker for required flag
 // TODO: Add ability to ignore unknown flags
 // TODO: Add descriptions for usage
 // TODO: Come up with a way to get a flag by its name

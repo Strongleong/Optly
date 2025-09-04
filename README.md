@@ -134,6 +134,16 @@ So for example:
 In other words, each command comes with its own separate set of flags, and optly will switch context as soon as it sees the command name.
 Subcommands like `./app list help` or positional arguments (`./app input.txt`) are not there yet. Maybe one day, but not today.
 
+### Usage functions
+
+Optly also ships with a couple of helper functions to quickly print usage info:
+
+ - `optly_usage(bin_path, commands, flags)` Prints a top-level usage message. Shows available global flags and commands.
+ - `optly_command_usage(bin_path, command)` Prints usage message for a single command, including its flags.
+
+They both use the same arrays you already pass into the parser, so you don’t need to maintain a separate “usage string” by hand.
+Good for `--help` flags, or when you want to yell at the user for giving you wrong args.
+
 Example output of `optly_usage()`:
 
 ```console
@@ -156,15 +166,6 @@ FLAGS
   -s --switch
 ```
 
-### Usage functions
-
-Optly also ships with a couple of helper functions to quickly print usage info:
-
- - `optly_usage(bin_path, commands, flags)` Prints a top-level usage message. Shows available global flags and commands.
- - `optly_command_usage(bin_path, command)` Prints usage message for a single command, including its flags.
-
-They both use the same arrays you already pass into the parser, so you don’t need to maintain a separate “usage string” by hand.
-Good for `--help` flags, or when you want to yell at the user for giving you wrong args.
 
 ## How to run tests
 
