@@ -1,5 +1,5 @@
 /*
-    optly.h - v0.0.0 - Single-header OPTLY arguments parser
+    optly.h - v1.0.0 - Single-header OPTLY arguments parser
     STB-style: include this header, then define OPTLYARGS_IMPLEMENTATION in ONE .c file
 
     Usage:
