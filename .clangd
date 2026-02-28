@@ -1,3 +1,8 @@
+FallbackFlags:
+  - -std=c11
+  - -I.
+Format:
+  Style: file
 If:
   PathMatch: ['optly.h']
 CompileFlags:
