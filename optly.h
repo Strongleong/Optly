@@ -157,35 +157,34 @@ typedef struct {
     OptlyFlagType type; ///< Flag type
 } OptlyFlag;
 
-/**
- * Represents a OPTLY command with associated flags.
- */
-typedef struct {
-    char       *name;                       ///< Command name
-    char *description;
-    OptlyFlag  *flags;    ///< Array of flags termitaed by NULL_FALG macro
-} OptlyCommand;
-
 typedef struct {
     char *values[OPTLY_MAX_POSITIONALS];
     size_t count;
 } OptlyPositionals;
 
-typedef struct OptlyArgs {
-    OptlyCommand *command;
+
+typedef struct OptlyCommand OptlyCommand;
+/**
+ * Represents a OPTLY command with associated flags.
+ */
+struct OptlyCommand {
+    char       *name;                       ///< Command name
+    char *description;
+    OptlyFlag  *flags;    ///< Array of flags termitaed by NULL_FALG macro
+    OptlyCommand *commands;
+    OptlyCommand *next_command;
     OptlyPositionals positionals;
-    char bin_path[MAX_PATH_LENGTH];
-} OptlyArgs;
+};
 
 #define NULL_FLAG    { .fullname = NULL, .shortname = 0, .value = { .as_int64 = 0 }, .type = 0 }
 #define NULL_COMMAND { .name = NULL, .flags =  NULL  }
 
-#define OPTLY_CMD(name, description, ...) { (name), (description), (OptlyFlag[]) {__VA_ARGS__ NULL_FLAG} }
+#define OPTLY_CMD(name, description, ...) { (name), (description), (OptlyFlag[]) {__VA_ARGS__ NULL_FLAG}, NULL, NULL, {0}}
 
 /**
  * Parse OPTLY arguments into a OptlyArgs structure.
  */
-OPTLYDEF OptlyArgs optly_parse_args(int argc, char *argv[], OptlyFlag *flags, OptlyCommand *commands);
+OPTLYDEF OptlyCommand optly_parse_args(int argc, char *argv[], OptlyFlag *flags, OptlyCommand *commands);
 
 /**
  * Print usage message with commands and global flags.
@@ -513,30 +512,37 @@ static OPTLYDEF void optly__parse_flags(char ***argv_ptr, int *argc_ptr, OptlyFl
 /**
  * Parse a command from argv.
  */
-static OPTLYDEF void optly__parse_command(const char *arg, OptlyArgs *args, OptlyCommand *commands) {
+static OPTLYDEF OptlyCommand *optly__parse_command(const char *arg,OptlyCommand *commands) {
     for (OptlyCommand *cmd = commands; !optly_is_command_null(cmd); cmd++) {
         if (strcmp(arg, cmd->name) == 0) {
-            args->command = cmd;
-            return;
+            return cmd;
         }
     }
+
+    return NULL;
 }
 
-static OPTLYDEF void optly__push_positionals(OptlyArgs *args, char *value) {
-    assert(args->positionals.count < OPTLY_MAX_POSITIONALS);
-    args->positionals.values[args->positionals.count++] = value;
+static OPTLYDEF void optly__push_positionals(OptlyPositionals *positionals, char *value) {
+    assert(positionals->count < OPTLY_MAX_POSITIONALS);
+    positionals->values[positionals->count++] = value;
 }
 
 /**
  * Parse OPTLY arguments.
  */
-OPTLYDEF OptlyArgs optly_parse_args(int argc, char *argv[], OptlyFlag *flags, OptlyCommand *commands) {
+OPTLYDEF OptlyCommand optly_parse_args(int argc, char *argv[], OptlyFlag *flags, OptlyCommand *commands) {
     assert(argc > 0);
 
-    OptlyArgs args = {0};
-    strcpy(args.bin_path, argv[0]);
-    SHIFT_ARG(argv, argc);
+    static OptlyCommand main_cmd = {0};
+    main_cmd.name = argv[0];
+    main_cmd.description = "Main command";
+    main_cmd.flags = flags;
+    main_cmd.commands = commands;
+
+    OptlyCommand *current_cmd = &main_cmd;
     bool positional_only = false;
+
+    SHIFT_ARG(argv, argc);
 
     while (argc > 0) {
         char *arg = *argv;
@@ -546,43 +552,42 @@ OPTLYDEF OptlyArgs optly_parse_args(int argc, char *argv[], OptlyFlag *flags, Op
         }
 
         if (positional_only) {
-            optly__push_positionals(&args, arg);
+            optly__push_positionals(&current_cmd->positionals, arg);
             SHIFT_ARG(argv, argc);
             continue;
         }
 
         if (arg[0] == '-') {
             if (arg[1] == '-' && arg[2] == '\0') {
-                positional_only = true;
-            } else if (args.command) {
-                optly__parse_flags(&argv, &argc, args.command->flags);
-            } else if (flags) {
-                optly__parse_flags(&argv, &argc, flags);
                 // `--` encountered
+                positional_only = true;
+            } else if (current_cmd->flags) {
+                optly__parse_flags(&argv, &argc, current_cmd->flags);
             } else {
-                optly__push_positionals(&args, arg);
+                optly__push_positionals(&current_cmd->positionals, arg);
             }
         } else {
-            if (commands && !args.command) {
-                optly__parse_command(arg, &args, commands);
-            }
-
-            if (!args.command) {
-                optly__push_positionals(&args, arg);
+            if (!current_cmd->commands) {
+                optly__push_positionals(&current_cmd->positionals, arg);
+            } else {
+                current_cmd->next_command = optly__parse_command(arg, current_cmd->commands);
+                current_cmd = current_cmd->next_command;
             }
         }
 
         SHIFT_ARG(argv, argc);
     }
 
-    return args;
+    current_cmd->next_command = NULL;
+    return main_cmd;
 }
 
 #endif // OPTLYARGS_IMPLEMENTATION
 
-// TODO: Add sub-commands
+// TODO: Return TREE/LIST of commands
 // TODO: Come up with a way to get a flag by its name (should I?)
 // TODO: Add auto `command --help|-h` and `help command`
+// TODO: Name and description for positionals
 // TODO: Add ability to ignore unknown flags @disable_warnings
 // TODO: Add ability to disable error messages @disable_warnings (logcie?)
 // TODO: Should I print type of flag value? @print_flag_type
