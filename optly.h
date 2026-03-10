@@ -1,29 +1,95 @@
 /*
-    optly.h - v1.0.0 - Single-header OPTLY arguments parser
-    STB-style: include this header, then define OPTLYARGS_IMPLEMENTATION in ONE .c file
+    optly.h — v1.1.0
+    Single-header command line argument parser for C.
 
-    Usage:
+    Features
+    --------
+    * STB-style single-header library
+    * Commands and command-specific flags
+    * Long flags (--verbose)
+    * Short flags (-v)
+    * Batched short flags (-abc)
+    * Inline flag values (--threads=4)
+    * Separate flag values (--threads 4)
+    * Typed flag values
+    * Positional arguments
+    * Optional commands
+    * Optional flags
+    * No dynamic memory allocation
+    * Portable C (C99)
+
+    Basic Usage
+    -----------
+
         #define OPTLYARGS_IMPLEMENTATION
-        #include "optlyargs.h"
+        #include "optly.h"
 
-    OVERVIEW:
-        This library provides a simple command-line argument parser with support
-        for commands and flags. Flags can be long-form (--example) or short-form (-e).
-        Short-form flags can be batched (e.g., `-abc` = `-a -b -c`).
-        Flags can also take values, either separated by space or `=` sign:
-            ./app --name=John
-            ./app -n John
+        static OptlyFlag flags[] = {
+            { "verbose", 'v', "Enable verbose output", {false}, OPTLY_TYPE_BOOL },
+            { "threads", 't', "Worker threads", {4}, OPTLY_TYPE_UINT32 },
+            NULL_FLAG
+        };
 
-        Commands are positional arguments that do not start with `-`.
-        A command can have its own flags.
+        static OptlyCommand commands[] = {
+            OPTLY_CMD("run",
+                { "port", 'p', "Server port", {8080}, OPTLY_TYPE_UINT16 }
+            ),
+            NULL_COMMAND
+        };
 
-    Example:
-        `./app --verbose build --target x86`
+        int main(int argc, char **argv)
+        {
+            OptlyArgs args = optly_parse_args(argc, argv, flags, commands);
 
-        In this example:
-            * Global flag: --verbose
-            * Command: build
-            * Command flag: --target x86
+            if (args.command)
+                printf("Command: %s\n", args.command->name);
+
+            printf("Threads: %u\n", flags[1].value.as_uint32);
+        }
+
+    Commands
+    --------
+
+    Commands are positional tokens that do not begin with '-'.
+
+        app build
+        app run
+
+    Each command may define its own flags.
+
+    Flags
+    -----
+
+    Flags may be long or short.
+
+        --verbose
+        -v
+
+    Flags may have values.
+
+        --threads=4
+        --threads 4
+        -t 4
+
+    Short flags can be batched.
+
+        -abc  ->  -a -b -c
+
+    Positional Arguments
+    --------------------
+
+    Any non-flag tokens after command selection are stored as positional arguments.
+
+        app build file1 file2
+
+    Access:
+
+        args.positionals.values[i]
+
+    Licese
+    ------
+
+    MIT/Public domain - choose whitchever you prefer
 */
 
 #ifndef OPTLYARGS_H
@@ -39,6 +105,8 @@
 
 // if you need more than 512 args per ONE command you should look in the mirror really deep
 #define MAX_FLAGS_LENGTH 512
+// same with positional arguments
+#define OPTLY_MAX_POSITIONALS 64
 #define MAX_PATH_LENGTH  4096
 
 typedef enum OptlyFlagType {
@@ -84,6 +152,7 @@ typedef union OtplyFlagValue {
 typedef struct {
     char *fullname;   ///< Long name of the flag (e.g., "verbose")
     char  shortname;  ///< Short name (e.g., 'v')
+    char *description;
     OptlyFlagValue value; ///< Value for the flag, based on flag type
     OptlyFlagType type; ///< Flag type
 } OptlyFlag;
@@ -93,18 +162,25 @@ typedef struct {
  */
 typedef struct {
     char       *name;                       ///< Command name
+    char *description;
     OptlyFlag  *flags;    ///< Array of flags termitaed by NULL_FALG macro
 } OptlyCommand;
 
+typedef struct {
+    char *values[OPTLY_MAX_POSITIONALS];
+    size_t count;
+} OptlyPositionals;
+
 typedef struct OptlyArgs {
     OptlyCommand *command;
+    OptlyPositionals positionals;
     char bin_path[MAX_PATH_LENGTH];
 } OptlyArgs;
 
 #define NULL_FLAG    { .fullname = NULL, .shortname = 0, .value = { .as_int64 = 0 }, .type = 0 }
 #define NULL_COMMAND { .name = NULL, .flags =  NULL  }
 
-#define OPTLY_CMD(name, ...) { (name), (OptlyFlag[]) {__VA_ARGS__ NULL_FLAG} }
+#define OPTLY_CMD(name, description, ...) { (name), (description), (OptlyFlag[]) {__VA_ARGS__ NULL_FLAG} }
 
 /**
  * Parse OPTLY arguments into a OptlyArgs structure.
@@ -148,14 +224,51 @@ inline bool optly_is_command_null(const OptlyCommand *cmd) {
 
 #define SHIFT_ARG(argv, argc) (++(argv), --(argc))
 
+static OPTLYDEF size_t optly__flag_print_width(OptlyFlag *flags) {
+    size_t max = 0;
+
+    for (OptlyFlag *flag = flags; !optly_is_flag_null(flag); flag++) {
+        size_t len = 0;
+
+        if (flag->shortname) {
+            len += 2;
+        }
+
+        if (flag->fullname) {
+            len += strlen(flag->fullname) + 3;
+        }
+
+        if (len > max) {
+            max = len;
+        }
+    }
+
+    return max;
+}
+
+static OPTLYDEF size_t optly__command_print_width(OptlyCommand *commands) {
+    size_t max = 0;
+
+    for (OptlyCommand *cmd = commands; !optly_is_command_null(cmd); cmd++) {
+        size_t len = strlen(cmd->name);
+
+        if (len > max) {
+            max = len;
+        }
+    }
+
+    return max;
+}
+
 /**
  * Print list of available commands.
  */
 static OPTLYDEF void optly__usage_commands_list(OptlyCommand *commands) {
     fprintf(stderr, "COMMANDS\n");
+    size_t pad = optly__command_print_width(commands);
 
     for (OptlyCommand *cmd = commands; !optly_is_command_null(cmd); cmd++) {
-        fprintf(stderr, "  %s\n", cmd->name);
+        fprintf(stderr, "  %-*s  %s\n", (int)pad, cmd->name, cmd->description);
     }
 }
 
@@ -163,10 +276,31 @@ static OPTLYDEF void optly__usage_commands_list(OptlyCommand *commands) {
  * Print list of flags.
  */
 static OPTLYDEF void optly__usage_flags(OptlyFlag *flags) {
+    if (!flags) {
+        return;
+    }
+
     fprintf(stderr, "FLAGS\n");
+    size_t pad = optly__flag_print_width(flags);
 
     for (OptlyFlag *flag = flags; !optly_is_flag_null(flag); flag++) {
-        fprintf(stderr, "  -%c --%s\n", flag->shortname, flag->fullname);
+        size_t buflen = 128;
+        char buf[buflen];
+
+        snprintf(buf, buflen, "  ");
+
+        if (flag->shortname && flag->fullname) {
+            snprintf(buf, buflen, "-%c --%s", flag->shortname, flag->fullname);
+        } else if (flag->fullname) {
+            snprintf(buf, buflen, "--%s", flag->fullname);
+        }
+        else {
+            snprintf(buf, buflen, "-%c", flag->shortname);
+        }
+
+        // NOTE: @print_flag_type
+        fprintf(stderr, "  %-*s  %s\n", (int)pad, buf, flag->description);
+
     }
 }
 
@@ -388,6 +522,11 @@ static OPTLYDEF void optly__parse_command(const char *arg, OptlyArgs *args, Optl
     }
 }
 
+static OPTLYDEF void optly__push_positionals(OptlyArgs *args, char *value) {
+    assert(args->positionals.count < OPTLY_MAX_POSITIONALS);
+    args->positionals.values[args->positionals.count++] = value;
+}
+
 /**
  * Parse OPTLY arguments.
  */
@@ -409,11 +548,20 @@ OPTLYDEF OptlyArgs optly_parse_args(int argc, char *argv[], OptlyFlag *flags, Op
         if (arg[0] == '-') {
             if (args.command) {
                 optly__parse_flags(&argv, &argc, args.command->flags);
-            } else {
+            } else if (flags) {
                 optly__parse_flags(&argv, &argc, flags);
             }
+            else {
+                optly__push_positionals(&args, arg);
+            }
         } else {
-            optly__parse_command(arg, &args, commands);
+            if (commands && !args.command) {
+                optly__parse_command(arg, &args, commands);
+            }
+
+            if (!args.command) {
+                optly__push_positionals(&args, arg);
+            }
         }
 
         SHIFT_ARG(argv, argc);
@@ -425,8 +573,49 @@ OPTLYDEF OptlyArgs optly_parse_args(int argc, char *argv[], OptlyFlag *flags, Op
 #endif // OPTLYARGS_IMPLEMENTATION
 
 // TODO: Add sub-commands
-// TODO: Add positional arguments
 // TODO: Add ability to ignore unknown flags
-// TODO: Add descriptions for usage
 // TODO: Come up with a way to get a flag by its name
 // TODO: Add ability to disable error messages @disable_warnings (logcie?)
+// TODO: Should I print type of flag value? @print_flag_type
+
+/*
+   ------------------------------------------------------------------------------
+   This software is available under 2 licenses -- choose whichever you prefer.
+   ------------------------------------------------------------------------------
+   ALTERNATIVE A - MIT License
+   Copyright (c) 2026 Nikita Chukov nikita_chul@mail.ru
+   Permission is hereby granted, free of charge, to any person obtaining a copy of
+   this software and associated documentation files (the "Software"), to deal in
+   the Software without restriction, including without limitation the rights to
+   use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+   of the Software, and to permit persons to whom the Software is furnished to do
+   so, subject to the following conditions:
+   The above copyright notice and this permission notice shall be included in all
+   copies or substantial portions of the Software.
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+   SOFTWARE.
+   ------------------------------------------------------------------------------
+   ALTERNATIVE B - Public Domain (www.unlicense.org)
+   This is free and unencumbered software released into the public domain.
+   Anyone is free to copy, modify, publish, use, compile, sell, or distribute this
+   software, either in source code form or as a compiled binary, for any purpose,
+   commercial or non-commercial, and by any means.
+   In jurisdictions that recognize copyright laws, the author or authors of this
+   software dedicate any and all copyright interest in the software to the public
+   domain. We make this dedication for the benefit of the public at large and to
+   the detriment of our heirs and successors. We intend this dedication to be an
+   overt act of relinquishment in perpetuity of all present and future rights to
+   this software under copyright law.
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+   AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+   ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+   WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+   ------------------------------------------------------------------------------
+*/

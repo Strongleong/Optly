@@ -38,10 +38,10 @@ static void call_parse(char **vec, int len, OptlyFlag *flags) {
 /* ---------- flag set used in tests ---------- */
 
 static OptlyFlag g_flags[] = {
-    { "help",    'h', {0}, OPTLY_TYPE_BOOL   },
-    { "verbose", 'v', {0}, OPTLY_TYPE_BOOL   },
-    { "value",   'x', {0}, OPTLY_TYPE_INT64  },
-    { "name",    'n', {0}, OPTLY_TYPE_STRING },
+    { "help",    'h', "", {0}, OPTLY_TYPE_BOOL   },
+    { "verbose", 'v', "", {0}, OPTLY_TYPE_BOOL   },
+    { "value",   'x', "", {0}, OPTLY_TYPE_INT64  },
+    { "name",    'n', "", {0}, OPTLY_TYPE_STRING },
     NULL_FLAG
 };
 

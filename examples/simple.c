@@ -4,17 +4,17 @@
 #include <optly.h>
 
 static OptlyFlag flags[] = {
-  { "value",  'v', {0},     OPTLY_TYPE_UINT32 },
-  { "switch", 's', {false}, OPTLY_TYPE_BOOL },
+  { "value",  'v', "value",  {0},     OPTLY_TYPE_UINT32 },
+  { "switch", 's', "switch", {false}, OPTLY_TYPE_BOOL },
   NULL_FLAG,
 };
 
 static OptlyCommand commands[] = {
-  OPTLY_CMD("help"),
+  OPTLY_CMD("help", "help"),
 
-  OPTLY_CMD("download",
-    { "url",    'u', {NULL},  OPTLY_TYPE_STRING },
-    { "switch", 's', {false}, OPTLY_TYPE_BOOL },
+  OPTLY_CMD("download", "get from url",
+    { "url",    'u', "url",    {NULL},  OPTLY_TYPE_STRING },
+    { "switch", 's', "switch", {false}, OPTLY_TYPE_BOOL },
   ),
 
   NULL_COMMAND,
@@ -22,8 +22,13 @@ static OptlyCommand commands[] = {
 
 int main(int argc, char *argv[]) {
   OptlyArgs args = optly_parse_args(argc, argv, flags, commands);
-  optly_command_usage(args.bin_path, &commands[1]);
-  return 0;
+  // optly_command_usage(args.bin_path, &commands[1]);
+  //
+  // for (size_t i = 0; i < args.positionals.count; i++) {
+  //   printf("%s\n", args.positionals.values[i]);
+  // }
+  //
+  // return 0;
 
   if (flags[2].value.as_bool || args.command == &commands[0]) {
     optly_usage(args.bin_path, commands, flags);
