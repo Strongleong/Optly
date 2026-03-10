@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-CFLAGS="-Wall -Wextra -std=c99"
+CFLAGS="-Wall -Wextra -std=c99 -pedantic"
 CLIBS="-I./"
 CDEBUG="-O0 -ggdb -fsanitize=address -fno-omit-frame-pointer"
 CPROFILE="-pg"
