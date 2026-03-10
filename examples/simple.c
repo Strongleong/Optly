@@ -22,13 +22,6 @@ static OptlyCommand commands[] = {
 
 int main(int argc, char *argv[]) {
   OptlyArgs args = optly_parse_args(argc, argv, flags, commands);
-  // optly_command_usage(args.bin_path, &commands[1]);
-  //
-  // for (size_t i = 0; i < args.positionals.count; i++) {
-  //   printf("%s\n", args.positionals.values[i]);
-  // }
-  //
-  // return 0;
 
   if (flags[2].value.as_bool || args.command == &commands[0]) {
     optly_usage(args.bin_path, commands, flags);
@@ -51,5 +44,12 @@ int main(int argc, char *argv[]) {
   printf("Download url    = %s\n", commands[1].flags[0].value.as_string);
   printf("Download switch = %s\n", commands[1].flags[1].value.as_bool ? "true" : "false");
 
+  printf("Positionals: ");
+
+  for (size_t i = 0; i < args.positionals.count - 1; i++) {
+    printf("%s, ", args.positionals.values[i]);
+  }
+
+  printf("%s\n", args.positionals.values[args.positionals.count - 1]);
   return 0;
 }

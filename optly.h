@@ -536,6 +536,7 @@ OPTLYDEF OptlyArgs optly_parse_args(int argc, char *argv[], OptlyFlag *flags, Op
     OptlyArgs args = {0};
     strcpy(args.bin_path, argv[0]);
     SHIFT_ARG(argv, argc);
+    bool positional_only = false;
 
     while (argc > 0) {
         char *arg = *argv;
@@ -544,14 +545,21 @@ OPTLYDEF OptlyArgs optly_parse_args(int argc, char *argv[], OptlyFlag *flags, Op
             break;
         }
 
+        if (positional_only) {
+            optly__push_positionals(&args, arg);
+            SHIFT_ARG(argv, argc);
+            continue;
+        }
 
         if (arg[0] == '-') {
-            if (args.command) {
+            if (arg[1] == '-' && arg[2] == '\0') {
+                positional_only = true;
+            } else if (args.command) {
                 optly__parse_flags(&argv, &argc, args.command->flags);
             } else if (flags) {
                 optly__parse_flags(&argv, &argc, flags);
-            }
-            else {
+                // `--` encountered
+            } else {
                 optly__push_positionals(&args, arg);
             }
         } else {
@@ -573,8 +581,9 @@ OPTLYDEF OptlyArgs optly_parse_args(int argc, char *argv[], OptlyFlag *flags, Op
 #endif // OPTLYARGS_IMPLEMENTATION
 
 // TODO: Add sub-commands
-// TODO: Add ability to ignore unknown flags
-// TODO: Come up with a way to get a flag by its name
+// TODO: Come up with a way to get a flag by its name (should I?)
+// TODO: Add auto `command --help|-h` and `help command`
+// TODO: Add ability to ignore unknown flags @disable_warnings
 // TODO: Add ability to disable error messages @disable_warnings (logcie?)
 // TODO: Should I print type of flag value? @print_flag_type
 
