@@ -10,33 +10,41 @@ static OptlyFlag flags[] = {
 };
 
 static OptlyCommand commands[] = {
-  OPTLY_CMD("help", "help"),
+    {
+      "help",
+      "see help",
+      (OptlyFlag[]){NULL_FLAG},
+      (OptlyCommand[]){
+        OPTLY_CMD("test", "test cmd", { "flag", 'f', "flag for test cmd", {0}, OPTLY_TYPE_BOOL },),
+        NULL_COMMAND,
+      },
+      NULL,
+      {0},
+    },
 
-  OPTLY_CMD("download", "get from url",
-    { "url",    'u', "url",    {NULL},  OPTLY_TYPE_STRING },
-    { "switch", 's', "switch", {false}, OPTLY_TYPE_BOOL },
-  ),
+    OPTLY_CMD("download", "get from url",
+              {"url", 'u', "url", {NULL}, OPTLY_TYPE_STRING},
+              {"switch", 's', "switch", {false}, OPTLY_TYPE_BOOL}, ),
 
-  NULL_COMMAND,
+    NULL_COMMAND,
 };
 
 int main(int argc, char *argv[]) {
-  OptlyArgs args = optly_parse_args(argc, argv, flags, commands);
+  OptlyCommand cmd = optly_parse_args(argc, argv, flags, commands);
 
-  if (flags[2].value.as_bool || args.command == &commands[0]) {
-    optly_usage(args.bin_path, commands, flags);
+  if (flags[2].value.as_bool || &cmd == &commands[0]) {
+    optly_usage(cmd.name, cmd.commands, cmd.flags);
     return 0;
   }
 
-  printf("Binary: %s\n", args.bin_path);
+  // printf("Binary: %s\n", cmd.bin_path);
 
-  if (args.command) {
-    if (args.command == &commands[1]) {
-      optly_usage(args.bin_path, commands, flags);
-    }
+  optly_command_usage("a", &cmd);
+  // if (cmd == &commands[1]) {
+  //   // optly_usage(cmd.bin_path, commands, flags);
+  // }
 
-    printf("Command: %s\n", args.command->name);
-  }
+  printf("Command: %s\n", cmd.name);
 
   printf("Value  = %u\n", flags[0].value.as_uint32);
   printf("Switch = %s\n\n", flags[1].value.as_bool ? "true" : "false");
@@ -46,10 +54,10 @@ int main(int argc, char *argv[]) {
 
   printf("Positionals: ");
 
-  for (size_t i = 0; i < args.positionals.count - 1; i++) {
-    printf("%s, ", args.positionals.values[i]);
-  }
-
-  printf("%s\n", args.positionals.values[args.positionals.count - 1]);
+  // for (size_t i = 0; i < cmd.positionals.count - 1; i++) {
+  //   printf("%s, ", cmd.positionals.values[i]);
+  // }
+  //
+  // printf("%s\n", cmd.positionals.values[cmd.positionals.count - 1]);
   return 0;
 }
