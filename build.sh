@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 
 CFLAGS="-Wall -Wextra -std=c99"
