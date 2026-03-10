@@ -162,10 +162,10 @@ static OPTLYDEF void optly__usage_commands_list(OptlyCommand *commands) {
 /**
  * Print list of flags.
  */
-static OPTLYDEF void optly__usage_flags(OptlyFlag **flags) {
+static OPTLYDEF void optly__usage_flags(OptlyFlag *flags) {
     fprintf(stderr, "FLAGS\n");
 
-    for (OptlyFlag *flag = *flags; !optly_is_flag_null(flag); flag++) {
+    for (OptlyFlag *flag = flags; !optly_is_flag_null(flag); flag++) {
         fprintf(stderr, "  -%c --%s\n", flag->shortname, flag->fullname);
     }
 }
@@ -174,7 +174,7 @@ OPTLYDEF void optly_command_usage(char const *const bin_path, OptlyCommand *comm
   const char *name = strrchr(bin_path, '/');
   name = name ? name + 1 : bin_path;
   fprintf(stderr, "%s [FLAGS] %s [COMMAND FLAGS]\n", name, command->name);
-  optly__usage_flags(&command->flags);
+  optly__usage_flags(command->flags);
 }
 
 OPTLYDEF void optly_usage(char const *const bin_path, OptlyCommand *commands, OptlyFlag *flags) {
@@ -182,7 +182,7 @@ OPTLYDEF void optly_usage(char const *const bin_path, OptlyCommand *commands, Op
   name = name ? name + 1 : bin_path;
   fprintf(stderr, "%s [FLAGS] <COMMAND> [COMMAND FLAGS]\n", name);
   optly__usage_commands_list(commands);
-  optly__usage_flags(&flags);
+  optly__usage_flags(flags);
 }
 
 /**
