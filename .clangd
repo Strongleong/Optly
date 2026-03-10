@@ -1,2 +1,4 @@
+If:
+  PathMatch: ['optly.h']
 CompileFlags:
   Add: [-DOPTLYARGS_IMPLEMENTATION]
