@@ -55,11 +55,9 @@ typedef enum OptlyFlagType {
     OPTLY_TYPE_UINT64,
     OPTLY_TYPE_FLOAT,
     OPTLY_TYPE_DOUBLE,
-    /* OPTLY_TYPE_PTR, */
 } OptlyFlagType;
 
 typedef union OtplyFlagValue {
-    void  *as_ptr;
     bool   as_bool;
 
     char  as_char;
@@ -95,7 +93,7 @@ typedef struct {
  */
 typedef struct {
     char       *name;                       ///< Command name
-    OptlyFlag  *flags[MAX_FLAGS_LENGTH];    ///< Array of flags termitaed by NULL_FALG macro
+    OptlyFlag  *flags;    ///< Array of flags termitaed by NULL_FALG macro
 } OptlyCommand;
 
 typedef struct OptlyArgs {
@@ -103,8 +101,10 @@ typedef struct OptlyArgs {
     char bin_path[MAX_PATH_LENGTH];
 } OptlyArgs;
 
-#define NULL_FLAG    { .fullname = NULL, .shortname = 0, .value = { .as_ptr = NULL }, .type = 0 }
-#define NULL_COMMAND { .name = NULL, .flags = { NULL } }
+#define NULL_FLAG    { .fullname = NULL, .shortname = 0, .value = { .as_int64 = 0 }, .type = 0 }
+#define NULL_COMMAND { .name = NULL, .flags =  NULL  }
+
+#define OPTLY_CMD(name, ...) { (name), (OptlyFlag[]) {__VA_ARGS__ NULL_FLAG} }
 
 /**
  * Parse OPTLY arguments into a OptlyArgs structure.
@@ -130,7 +130,7 @@ inline bool optly_is_flag_null(const OptlyFlag *flag) {
 }
 
 inline bool optly_is_command_null(const OptlyCommand *cmd) {
-    return cmd == NULL || (cmd->name == NULL && (*cmd->flags == NULL || optly_is_flag_null(*cmd->flags)));
+    return cmd == NULL || cmd->name == NULL;
 }
 
 // -----------------------------------
@@ -144,7 +144,6 @@ inline bool optly_is_command_null(const OptlyCommand *cmd) {
 #include <stdio.h>
 #include <string.h>
 #include <strings.h>
-#include <libgen.h>
 #include <stdlib.h>
 
 #define SHIFT_ARG(argv, argc) (++(argv), --(argc))
@@ -172,18 +171,16 @@ static OPTLYDEF void optly__usage_flags(OptlyFlag **flags) {
 }
 
 OPTLYDEF void optly_command_usage(char const *const bin_path, OptlyCommand *command) {
-  // NOTE: Copying const path into non-const path bause of libgen basename
-  char name[strlen(bin_path) + 1];
-  strcpy(name, bin_path);
-  fprintf(stderr, "%s [FLAGS] %s [COMMAND FLAGS]\n", basename(name), command->name);
-  optly__usage_flags(command->flags);
+  const char *name = strrchr(bin_path, '/');
+  name = name ? name + 1 : bin_path;
+  fprintf(stderr, "%s [FLAGS] %s [COMMAND FLAGS]\n", name, command->name);
+  optly__usage_flags(&command->flags);
 }
 
 OPTLYDEF void optly_usage(char const *const bin_path, OptlyCommand *commands, OptlyFlag *flags) {
-  // NOTE: Copying const path into non-const path bause of libgen basename
-  char name[strlen(bin_path) + 1];
-  strcpy(name, bin_path);
-  fprintf(stderr, "%s [FLAGS] <COMMAND> [COMMAND FLAGS]\n", basename(name));
+  const char *name = strrchr(bin_path, '/');
+  name = name ? name + 1 : bin_path;
+  fprintf(stderr, "%s [FLAGS] <COMMAND> [COMMAND FLAGS]\n", name);
   optly__usage_commands_list(commands);
   optly__usage_flags(&flags);
 }
@@ -214,21 +211,21 @@ static OPTLYDEF OptlyFlag *optly__find_flag(const char *arg, OptlyFlag *flags) {
 
 static OPTLYDEF bool optly__flag_set_value(OptlyFlag *flag, char *value) {
     flag->value.as_int64 = 0;
+    char *end = "";
 
     switch (flag->type) {
         case OPTLY_TYPE_CHAR:   flag->value.as_char   = *value; break;
         case OPTLY_TYPE_STRING: flag->value.as_string = value; break;
-        case OPTLY_TYPE_INT8:   flag->value.as_int8   = atoll(value); break;
-        case OPTLY_TYPE_INT16:  flag->value.as_int16  = atoll(value); break;
-        case OPTLY_TYPE_INT32:  flag->value.as_int32  = atoll(value); break;
-        case OPTLY_TYPE_INT64:  flag->value.as_int64  = atoll(value); break;
-        case OPTLY_TYPE_UINT8:  flag->value.as_uint8  = atoll(value); break;
-        case OPTLY_TYPE_UINT16: flag->value.as_uint16 = atoll(value); break;
-        case OPTLY_TYPE_UINT32: flag->value.as_uint32 = atoll(value); break;
-        case OPTLY_TYPE_UINT64: flag->value.as_uint64 = atoll(value); break;
-        case OPTLY_TYPE_FLOAT:  flag->value.as_float  = atof(value); break;
-        case OPTLY_TYPE_DOUBLE: flag->value.as_double = atof(value); break;
-        /* case OPTLY_TYPE_PTR:    flag->value.as_ptr    = value; break; */
+        case OPTLY_TYPE_INT8:   flag->value.as_int8   = strtoll(value, &end, 10); break;
+        case OPTLY_TYPE_INT16:  flag->value.as_int16  = strtoll(value, &end, 10); break;
+        case OPTLY_TYPE_INT32:  flag->value.as_int32  = strtoll(value, &end, 10); break;
+        case OPTLY_TYPE_INT64:  flag->value.as_int64  = strtoll(value, &end, 10); break;
+        case OPTLY_TYPE_UINT8:  flag->value.as_uint8  = strtoll(value, &end, 10); break;
+        case OPTLY_TYPE_UINT16: flag->value.as_uint16 = strtoll(value, &end, 10); break;
+        case OPTLY_TYPE_UINT32: flag->value.as_uint32 = strtoll(value, &end, 10); break;
+        case OPTLY_TYPE_UINT64: flag->value.as_uint64 = strtoll(value, &end, 10); break;
+        case OPTLY_TYPE_FLOAT:  flag->value.as_float  = strtod(value, &end); break;
+        case OPTLY_TYPE_DOUBLE: flag->value.as_double = strtod(value, &end); break;
 
         case OPTLY_TYPE_BOOL: {
             if (!value) {
@@ -263,14 +260,13 @@ static OPTLYDEF bool optly__flag_set_value(OptlyFlag *flag, char *value) {
         }
     }
 
-    if (flag->type > OPTLY_TYPE_INT8 && flag->type < OPTLY_TYPE_DOUBLE && flag->value.as_int64 == 0) {
-        fprintf(stderr, "ERROR: Argument '%s' is not a number\n", flag->fullname);
+    if (*end != '\0') {
+        fprintf(stderr, "ERROR: Argument '%s' is not a number (%s)\n", flag->fullname, value);
         return false;
     }
 
     if (flag->type == OPTLY_TYPE_BOOL && flag->value.as_int8 == -1) {
-        fprintf(stderr, "Invalid boolean value for flag '%s': %s\n",
-                flag->fullname, value);
+        fprintf(stderr, "Invalid boolean value for flag '%s': %s\n", flag->fullname, value);
         return false;
     }
 
@@ -412,7 +408,7 @@ OPTLYDEF OptlyArgs optly_parse_args(int argc, char *argv[], OptlyFlag *flags, Op
 
         if (arg[0] == '-') {
             if (args.command) {
-                optly__parse_flags(&argv, &argc, *args.command->flags);
+                optly__parse_flags(&argv, &argc, args.command->flags);
             } else {
                 optly__parse_flags(&argv, &argc, flags);
             }
@@ -433,3 +429,4 @@ OPTLYDEF OptlyArgs optly_parse_args(int argc, char *argv[], OptlyFlag *flags, Op
 // TODO: Add ability to ignore unknown flags
 // TODO: Add descriptions for usage
 // TODO: Come up with a way to get a flag by its name
+// TODO: Add ability to disable error messages @disable_warnings (logcie?)

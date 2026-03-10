@@ -134,6 +134,12 @@ static void test_long_value_equals_and_space(void) {
     char *vec2[] = { "--value", "42", NULL };
     call_parse(vec2, 2, g_flags);
     assert(g_flags[2].value.as_int64 == 42);
+
+    // NOTE: @disable_warnings
+    // reset_flags(g_flags);
+    // char *vec3[] = { "--value", "vasya", NULL };
+    // call_parse(vec3, 2, g_flags);
+    // assert(g_flags[2].value.as_int64 != 42);
 }
 
 static void test_short_value_equals_and_space(void) {

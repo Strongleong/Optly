@@ -1,7 +1,7 @@
+#include <stdio.h>
+
 #define OPTLYARGS_IMPLEMENTATION
 #include <optly.h>
-
-#include <stdio.h>
 
 static OptlyFlag flags[] = {
   { "value",  'v', {0},     OPTLY_TYPE_UINT32 },
@@ -9,15 +9,14 @@ static OptlyFlag flags[] = {
   NULL_FLAG,
 };
 
-static OptlyFlag download_flags[] = {
-  { "url",    'u', {NULL},  OPTLY_TYPE_STRING },
-  { "switch", 's', {false}, OPTLY_TYPE_BOOL },
-  NULL_FLAG,
-};
-
 static OptlyCommand commands[] = {
-  { "help",     { NULL } },
-  { "download", {download_flags} },
+  OPTLY_CMD("help"),
+
+  OPTLY_CMD("download",
+    { "url",    'u', {NULL},  OPTLY_TYPE_STRING },
+    { "switch", 's', {false}, OPTLY_TYPE_BOOL },
+  ),
+
   NULL_COMMAND,
 };
 
@@ -44,8 +43,8 @@ int main(int argc, char *argv[]) {
   printf("Value  = %u\n", flags[0].value.as_uint32);
   printf("Switch = %s\n\n", flags[1].value.as_bool ? "true" : "false");
 
-  printf("Download url    = %s\n", download_flags[0].value.as_string);
-  printf("Download switch = %s\n", download_flags[1].value.as_bool ? "true" : "false");
+  printf("Download url    = %s\n", commands[1].flags[0].value.as_string);
+  printf("Download switch = %s\n", commands[1].flags[1].value.as_bool ? "true" : "false");
 
   return 0;
 }
