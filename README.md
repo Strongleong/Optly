@@ -25,7 +25,7 @@ Subcommands (like `./app list help`) and positional arguments are not implemente
 Here is basic example ([./examples/simple.c](./examples/simple.c)):
 
 ```c
-#define OPTLYARGS_IMPLEMENTATION
+#define OPTLY_IMPLEMENTATION
 #include <optly.h>
 
 #include <stdio.h>

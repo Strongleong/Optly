@@ -21,7 +21,7 @@
     Basic Usage
     -----------
 
-        #define OPTLYARGS_IMPLEMENTATION
+        #define OPTLY_IMPLEMENTATION
         #include "optly.h"
 
         static OptlyFlag flags[] = {
@@ -92,8 +92,8 @@
     MIT/Public domain - choose whitchever you prefer
 */
 
-#ifndef OPTLYARGS_H
-#define OPTLYARGS_H
+#ifndef OPTLY_H
+#define OPTLY_H
 
 #include <stddef.h>
 #include <stdbool.h>
@@ -225,9 +225,9 @@ inline bool optly_is_command_null(const OptlyCommand *cmd) {
 
 // -----------------------------------
 
-#endif // OPTLYARGS_H
+#endif // OPTLY_H
 
-#ifdef OPTLYARGS_IMPLEMENTATION
+#ifdef OPTLY_IMPLEMENTATION
 #include <assert.h>
 #include <ctype.h>
 #include <stdio.h>
@@ -686,7 +686,7 @@ inline OPTLYDEF bool optly_is_command(OptlyCommand *command, const char *name) {
     return command && strcmp(command->name, name) == 0;
 }
 
-#endif // OPTLYARGS_IMPLEMENTATION
+#endif // OPTLY_IMPLEMENTATION
 
 // TODO: Add auto `command --help|-h` and `help command`
 // TODO: Name and description for positionals

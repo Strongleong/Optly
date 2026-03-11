@@ -1,4 +1,4 @@
-#define OPTLYARGS_IMPLEMENTATION
+#define OPTLY_IMPLEMENTATION
 #include <optly.h>
 
 #include <assert.h>

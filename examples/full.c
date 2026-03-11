@@ -2,7 +2,7 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#define OPTLYARGS_IMPLEMENTATION
+#define OPTLY_IMPLEMENTATION
 #include <optly.h>
 
 static OptlyFlag flags[] = {
