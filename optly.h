@@ -193,7 +193,7 @@ struct OptlyCommand {
 #define optly_flag_float(name, ...)  optly_flag(name, __VA_ARGS__, .type = OPTLY_TYPE_FLOAT)
 #define optly_flag_double(name, ...) optly_flag(name, __VA_ARGS__, .type = OPTLY_TYPE_DOUBLE)
 
-OPTLYDEF OptlyCommand optly_parse_args(int argc, char *argv[], OptlyFlag *flags, OptlyCommand *commands);
+OPTLYDEF OptlyCommand *optly_parse_args(int argc, char *argv[], OptlyCommand *main_cmd);
 OPTLYDEF void optly_usage(char const *const bin_path, OptlyCommand *commands, OptlyFlag *flags);
 OPTLYDEF void optly_command_usage(char const *const bin_path, OptlyCommand *command);
 
@@ -546,17 +546,14 @@ static void optly__push_positionals(OptlyPositionals *positionals, char *value) 
 /**
  * Parse OPTLY arguments.
  */
-OPTLYDEF OptlyCommand optly_parse_args(int argc, char *argv[], OptlyFlag *flags, OptlyCommand *commands) {
+OPTLYDEF OptlyCommand *optly_parse_args(int argc, char *argv[], OptlyCommand *main_cmd) {
     assert(argc > 0);
 
-    static OptlyCommand main_cmd = {0};
-    main_cmd.name = argv[0];
-    main_cmd.description = "Main command";
-    main_cmd.flags = flags;
-    main_cmd.commands = commands;
-    main_cmd.next_command = NULL;
+    if (main_cmd->name == NULL) {
+        main_cmd->name = argv[0];
+    }
 
-    OptlyCommand *current_cmd = &main_cmd;
+    OptlyCommand *current_cmd = main_cmd;
     bool positional_only = false;
 
     SHIFT_ARG(argv, argc);
@@ -695,6 +692,7 @@ inline OPTLYDEF bool optly_is_command(OptlyCommand *command, const char *name) {
 // TODO: Should I print type of flag value in usage? @print_flag_type
 // TODO: Support different kind of numbers (0xBABA, 0123)?
 // TODO: Usage and version string customisation (usage per command)
+// TODO: Return state? errors? from optly_parse_args
 
 /*
    ------------------------------------------------------------------------------
