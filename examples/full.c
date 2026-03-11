@@ -10,6 +10,7 @@ static OptlyFlag flags[] = {
     optly_flag_string("config", 'c', "Config file path", .value.as_string = "./config"),
     optly_flag_string("env", 'e', "Environment (dev, staging, prod)", .value.as_string = "dev"),
     optly_flag_bool("json", 'j', "Output JSON"),
+    // NOTE: Do not forget to close flags array with NULL_FLAG
     NULL_FLAG,
 };
 
@@ -19,6 +20,7 @@ static OptlyCommand commands[] = {
         optly_flags(
             optly_flag_string("tags", 't', "Image tag"),
             optly_flag_string("file", 'f', "Dockerfile path"),
+            // NOTE: Here we skipped shortname. -n would not work but --no-cache will
             optly_flag_bool("no-cache", .description = "Disable build cache"))),
 
     optly_command(
@@ -29,6 +31,7 @@ static OptlyCommand commands[] = {
         optly_commands(
             optly_command("status", "Get status of deployed service"),
             optly_command("rollback", "Rollback service",
+              // NOTE: Flags for subcommand of command
                           optly_flags(
                             optly_flag_uint32("revision", 'r', "Revision to rollabck to"))))),
 
@@ -49,11 +52,12 @@ static OptlyCommand commands[] = {
         optly_flag_uint32("since", 's', "Show logs scinse timestamp"))),
 
     optly_command("service", "Manage services",
-     .commands = optly_commands(
-         optly_command( "start", .flags = optly_flags(
-               optly_flag_uint32("scale", 's', "Start N instances", .value.as_uint32 = 1))),
-         optly_command("stop", NULL),
-         optly_command("restart", NULL)
+        // NOTE: Here we don't have any flags so we skip then to subcommands
+        .commands = optly_commands(
+          optly_command( "start", .flags = optly_flags(
+              optly_flag_uint32("scale", 's', "Start N instances", .value.as_uint32 = 1))),
+          optly_command("stop", NULL),
+          optly_command("restart", NULL)
      )),
 
     NULL_COMMAND,

@@ -159,7 +159,6 @@ typedef struct {
     size_t count;
 } OptlyPositionals;
 
-
 typedef struct OptlyCommand OptlyCommand;
 struct OptlyCommand {
     char            *name;
