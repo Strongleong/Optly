@@ -693,6 +693,7 @@ inline OPTLYDEF bool optly_is_command(OptlyCommand *command, const char *name) {
 // TODO: Support different kind of numbers (0xBABA, 0123)?
 // TODO: Usage and version string customisation (usage per command)
 // TODO: Return state? errors? from optly_parse_args
+// TODO: Come up with a way to automatically choose field for .value in optly_flag
 
 /*
    ------------------------------------------------------------------------------
