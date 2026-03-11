@@ -688,14 +688,13 @@ inline OPTLYDEF bool optly_is_command(OptlyCommand *command, const char *name) {
 
 #endif // OPTLYARGS_IMPLEMENTATION
 
-// TODO: Return TREE/LIST of commands
-// TODO: Come up with a way to get a flag by its name (should I?)
 // TODO: Add auto `command --help|-h` and `help command`
 // TODO: Name and description for positionals
 // TODO: Add ability to ignore unknown flags @disable_warnings
 // TODO: Add ability to disable error messages @disable_warnings (logcie?)
-// TODO: Should I print type of flag value? @print_flag_type
+// TODO: Should I print type of flag value in usage? @print_flag_type
 // TODO: Support different kind of numbers (0xBABA, 0123)?
+// TODO: Usage and version string customisation (usage per command)
 
 /*
    ------------------------------------------------------------------------------
