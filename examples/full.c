@@ -15,52 +15,52 @@ static OptlyFlag flags[] = {
 };
 
 static OptlyCommand commands[] = {
-    optly_command(
-        "build", "Build container images",
-        optly_flags(
-            optly_flag_string("tags", 't', "Image tag"),
-            optly_flag_string("file", 'f', "Dockerfile path"),
-            // NOTE: Here we skipped shortname. -n would not work but --no-cache will
-            optly_flag_bool("no-cache", .description = "Disable build cache"))),
+  optly_command(
+      "build", "Build container images",
+      optly_flags(
+        optly_flag_string("tags", 't', "Image tag"),
+        optly_flag_string("file", 'f', "Dockerfile path"),
+        // NOTE: Here we skipped shortname. -n would not work but --no-cache will
+        optly_flag_bool("no-cache", .description = "Disable build cache"))),
 
-    optly_command(
-        "deploy", "Deploy servie",
-        optly_flags(
-            optly_flag_uint32("replicas", 'r', "Number of replicas"),
-            optly_flag_bool("wait", 'w', "Wait for deployment finishes")),
-        optly_commands(
-            optly_command("status", "Get status of deployed service"),
-            optly_command("rollback", "Rollback service",
-              // NOTE: Flags for subcommand of command
-                          optly_flags(
-                            optly_flag_uint32("revision", 'r', "Revision to rollabck to"))))),
+  optly_command(
+      "deploy", "Deploy servie",
+      optly_flags(
+        optly_flag_uint32("replicas", 'r', "Number of replicas"),
+        optly_flag_bool("wait", 'w', "Wait for deployment finishes")),
+      optly_commands(
+        optly_command("status", "Get status of deployed service"),
+        optly_command("rollback", "Rollback service",
+          // NOTE: Flags for subcommand of command
+          optly_flags(
+            optly_flag_uint32("revision", 'r', "Revision to rollabck to"))))),
 
-    optly_command("deploy", "Deploy service",
-        optly_flags(
-          optly_flag_uint32("replicas", 'r', "Number of replicas"),
-          optly_flag_bool("wait", 'w', "Wait for deployment finishes")),
-        optly_commands(
-          optly_command("status", "Get status of deployed service"))),
-          optly_command("rollback", "Rollback service",
-            optly_flags(
-              optly_flag("revision", 'r', "Revision to rollabck to"))),
+  optly_command("deploy", "Deploy service",
+      optly_flags(
+        optly_flag_uint32("replicas", 'r', "Number of replicas"),
+        optly_flag_bool("wait", 'w', "Wait for deployment finishes")),
+      optly_commands(
+        optly_command("status", "Get status of deployed service"))),
+  optly_command("rollback", "Rollback service",
+      optly_flags(
+        optly_flag("revision", 'r', "Revision to rollabck to"))),
 
-    optly_command("logs", "View service logs",
-        optly_flags(
+  optly_command("logs", "View service logs",
+      optly_flags(
         optly_flag_bool("follow", 'f', "Follow log output"),
         optly_flag_uint32("lines", 'n', "Number of lines ", .value.as_uint32 = 20),
         optly_flag_uint32("since", 's', "Show logs scinse timestamp"))),
 
-    optly_command("service", "Manage services",
-        // NOTE: Here we don't have any flags so we skip then to subcommands
-        .commands = optly_commands(
-          optly_command( "start", .flags = optly_flags(
-              optly_flag_uint32("scale", 's', "Start N instances", .value.as_uint32 = 1))),
-          optly_command("stop", NULL),
-          optly_command("restart", NULL)
-     )),
+  optly_command("service", "Manage services",
+      // NOTE: Here we don't have any flags so we skip then to subcommands
+      .commands = optly_commands(
+        optly_command( "start", .flags = optly_flags(
+            optly_flag_uint32("scale", 's', "Start N instances", .value.as_uint32 = 1))),
+        optly_command("stop", NULL),
+        optly_command("restart", NULL)
+        )),
 
-    NULL_COMMAND,
+  NULL_COMMAND,
 };
 
 void build(OptlyCommand *cmd) {
@@ -148,8 +148,7 @@ int main(int argc, char *argv[]) {
   } else if (optly_is_command(cmd.next_command, "services")) {
     services(cmd.next_command);
   } else if (optly_is_command(cmd.next_command, "stop")) {
-    printf("this will never reach it here, 'stop' command is subcommand of "
-           "'service' command\n");
+    printf("this will never reach it here, 'stop' command is subcommand of 'service' command\n");
   } else {
     optly_usage(cmd.name, cmd.commands, cmd.flags);
   }
