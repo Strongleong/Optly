@@ -98,14 +98,14 @@ static OptlyCommand cmd = optly_command(
 
 void build(OptlyCommand *cmd) {
   printf("Build command flags:\n");
-  printf("tags     = %s\n", optly_string(cmd, "tags"));
-  printf("file     = %s\n", optly_string(cmd, "file"));
-  printf("no-cache = %s\n", optly_bool(cmd, "no-cache") ? "true" : "false");
+  printf("tags     = %s\n", optly_flag_value_string(cmd, "tags"));
+  printf("file     = %s\n", optly_flag_value_string(cmd, "file"));
+  printf("no-cache = %s\n", optly_flag_value_bool(cmd, "no-cache") ? "true" : "false");
 }
 
 void rollback(OptlyCommand *cmd) {
   printf("Rollback command flags:\n");
-  printf("revision = %d\n", optly_uint32(cmd, "revision"));
+  printf("revision = %d\n", optly_flag_value_uint32(cmd, "revision"));
 }
 
 void status(OptlyCommand *cmd) {
@@ -115,8 +115,8 @@ void status(OptlyCommand *cmd) {
 
 void deploy(OptlyCommand *cmd) {
   printf("Logs command flags:\n");
-  printf("replicas = %d\n", optly_uint32(cmd, "replicas"));
-  printf("wait     = %s\n", optly_bool(cmd, "wait") ? "true" : "false");
+  printf("replicas = %d\n", optly_flag_value_uint32(cmd, "replicas"));
+  printf("wait     = %s\n", optly_flag_value_bool(cmd, "wait") ? "true" : "false");
 
   if (optly_is_command(cmd->next_command, "rollback")) {
     rollback(cmd->next_command);
@@ -129,14 +129,14 @@ void deploy(OptlyCommand *cmd) {
 
 void logs(OptlyCommand *cmd) {
   printf("Logs command flags:\n");
-  printf("follow   = %s\n", optly_bool(cmd, "follow") ? "true" : "false");
-  printf("lines    = %d\n", optly_uint32(cmd, "lines"));
-  printf("since    = %d\n", optly_uint32(cmd, "since"));
+  printf("follow   = %s\n", optly_flag_value_bool(cmd, "follow") ? "true" : "false");
+  printf("lines    = %d\n", optly_flag_value_uint32(cmd, "lines"));
+  printf("since    = %d\n", optly_flag_value_uint32(cmd, "since"));
 }
 
 void start(OptlyCommand *cmd) {
   printf("Start command flags:\n");
-  printf("scale = %d\n", optly_uint32(cmd, "scale"));
+  printf("scale = %d\n", optly_flag_value_uint32(cmd, "scale"));
 }
 
 void stop(OptlyCommand *cmd) {
@@ -167,10 +167,10 @@ int main(int argc, char *argv[]) {
   optly_parse_args(argc, argv, &cmd);
 
   printf("Global flags:\n");
-  printf("verbose = %s\n", optly_bool(&cmd, "verbose") ? "true" : "false");
-  printf("config  = %s\n", optly_string(&cmd, "config"));
-  printf("env     = %s\n", optly_string(&cmd, "env"));
-  printf("json    = %s\n", optly_bool(&cmd, "json") ? "true" : "false");
+  printf("verbose = %s\n", optly_flag_value_bool(&cmd, "verbose") ? "true" : "false");
+  printf("config  = %s\n", optly_flag_value_string(&cmd, "config"));
+  printf("env     = %s\n", optly_flag_value_string(&cmd, "env"));
+  printf("json    = %s\n", optly_flag_value_bool(&cmd, "json") ? "true" : "false");
 
   if (optly_is_command(cmd.next_command, "build")) {
     build(cmd.next_command);

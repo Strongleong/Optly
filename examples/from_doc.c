@@ -75,8 +75,8 @@ static OptlyCommand cmd = {
 int main(int argc, char **argv) {
   optly_parse_args(argc, argv, &cmd);
 
-  printf("Verbose: %s\n", optly_bool(&cmd, "verbose") ? "true" : "false");
-  printf("Threads: %u\n", optly_uint32(&cmd, "threads"));
+  printf("Verbose: %s\n", optly_flag_value_bool(&cmd, "verbose") ? "true" : "false");
+  printf("Threads: %u\n", optly_flag_value_uint32(&cmd, "threads"));
 
   if (!cmd.next_command) {
     return 0;
@@ -84,8 +84,8 @@ int main(int argc, char **argv) {
 
   printf("Command: %s\n", cmd.next_command->name);
 
-  printf("Verbose: %s\n", optly_bool(cmd.next_command, "verbose") ? "true" : "false");
-  printf("Port: %u\n", optly_uint16(cmd.next_command, "port"));
+  printf("Verbose: %s\n", optly_flag_value_bool(cmd.next_command, "verbose") ? "true" : "false");
+  printf("Port: %u\n", optly_flag_value_uint16(cmd.next_command, "port"));
 
   if (cmd.next_command->next_command) {
     printf("Command: %s\n", cmd.next_command->next_command->name);
