@@ -96,6 +96,8 @@ for example in $examples; do
   fi
 done
 
+wait
+
 if $VERBOSE; then
   set -x
 fi
