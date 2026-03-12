@@ -172,12 +172,12 @@ int main(int argc, char *argv[]) {
   printf("env     = %s\n", optly_flag_value_string(&cmd, "env"));
   printf("json    = %s\n", optly_flag_value_bool(&cmd, "json") ? "true" : "false");
 
-  if (cmd.positionals.count > 0) {
+  if (cmd.positionals->count > 0) {
     printf("Positionals:\n");
   }
 
-  for (size_t i = 0; i < cmd.positionals.count; i++) {
-    printf("%s\n", cmd.positionals.values[i]);
+  for (size_t i = 0; i < cmd.positionals->count; i++) {
+    printf("%s\n", cmd.positionals->values[i]);
   }
 
   if (optly_is_command(cmd.next_command, "build")) {

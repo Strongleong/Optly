@@ -214,9 +214,15 @@ typedef struct {
 } OptlyFlag;
 
 typedef struct {
+  char *name;
+  char *description;
+
+  size_t min;
+  size_t max;
+
   char  *values[OPTLY_MAX_POSITIONALS];
   size_t count;
-} OptlyPositionals;
+} OptlyPositional;
 
 typedef struct OptlyCommand OptlyCommand;
 struct OptlyCommand {
@@ -225,12 +231,14 @@ struct OptlyCommand {
 
   OptlyFlag       *flags;
   OptlyCommand    *commands;
-  OptlyCommand    *next_command;
-  OptlyPositionals positionals;
+  OptlyPositional *positionals;
+
+  OptlyCommand *next_command;
 };
 
-#define NULL_FLAG    {.fullname = NULL, .shortname = 0, .value = {.as_int64 = 0}, .type = 0}
-#define NULL_COMMAND {.name = NULL, .flags = NULL}
+#define NULL_FLAG       {.fullname = NULL, .shortname = 0, .value = {.as_int64 = 0}, .type = 0}
+#define NULL_COMMAND    {.name = NULL, .flags = NULL}
+#define NULL_POSITIONAL {.name = NULL}
 
 // NOTE: Forcing designated initializer to automatically zero initialize missing fields
 #define optly_flag(name, ...)        \
@@ -250,6 +258,15 @@ struct OptlyCommand {
 #define optly_commands(...)   \
   (OptlyCommand[]) {          \
     __VA_ARGS__, NULL_COMMAND \
+  }
+
+#define optly_positional(namme, ...) \
+  (OptlyPositional) {                \
+    .name = (namme), __VA_ARGS__     \
+  }
+#define optly_positionals(...)   \
+  (OptlyPositional[]) {          \
+    __VA_ARGS__, NULL_POSITIONAL \
   }
 
 #define optly_flag_bool(name, ...)   optly_flag(name, __VA_ARGS__, .type = OPTLY_TYPE_BOOL)
@@ -316,7 +333,7 @@ static const char *logcie_module = "OPTLY";
 #define LOG_VA(lvl, msg, ...) LOGCIE_LOG_VA(lvl, msg, __VA_ARGS__)
 #define LOG(lvl, msg)         LOGCIE_LOG(lvl, msg)
 #else
-#define LOG(lvl, msg) fprintf(stderr, #lvl ": " #msg "\n");
+#define LOG(lvl, msg)         fprintf(stderr, #lvl ": " #msg "\n");
 #define LOG_VA(lvl, msg, ...) fprintf(stderr, #lvl ": " msg "\n", __VA_ARGS__);
 #endif
 #endif
@@ -619,9 +636,41 @@ static OptlyCommand *optly__parse_command(const char *arg, OptlyCommand *command
   return NULL;
 }
 
-static void optly__push_positionals(OptlyPositionals *positionals, char *value) {
-  assert(positionals->count < OPTLY_MAX_POSITIONALS);
-  positionals->values[positionals->count++] = value;
+// TODO: spillback (left to right <min>, then right to left <max>)
+static void optly__push_positional(OptlyCommand *cmd, char *value) {
+  if (!cmd->positionals) return;
+
+  for (OptlyPositional *p = cmd->positionals; p->name; p++) {
+    if (p->max == 0 || p->count < p->max) {
+      p->values[p->count++] = value;
+      return;
+    }
+  }
+
+  LOG_VA(ERROR, "Too many positional arguments: %s", value);
+  exit(1);
+}
+
+static bool optly__validate_positionals(OptlyCommand *cmd) {
+  if (!cmd->positionals) {
+    return true;
+  }
+
+  bool ok = true;
+
+  for (OptlyPositional *pos = cmd->positionals; pos->name; pos++) {
+    if (pos->count < pos->min) {
+      LOG_VA(ERROR, "Not enough values for positional '%s'", pos->name);
+      ok = false;
+    }
+
+    if (pos->max != 0 && pos->count > pos->max) {
+      LOG_VA(ERROR, "Too many values for positional '%s'", pos->name);
+      ok = false;
+    }
+  }
+
+  return ok;
 }
 
 /**
@@ -649,7 +698,7 @@ OPTLYDEF OptlyCommand *optly_parse_args(int argc, char *argv[], OptlyCommand *ma
     }
 
     if (positional_only) {
-      optly__push_positionals(&current_cmd->positionals, arg);
+      optly__push_positional(current_cmd, arg);
       SHIFT_ARG(argv, argc);
       continue;
     }
@@ -661,14 +710,14 @@ OPTLYDEF OptlyCommand *optly_parse_args(int argc, char *argv[], OptlyCommand *ma
       } else if (current_cmd->flags) {
         optly__parse_flags(&argv, &argc, current_cmd->flags);
       } else {
-        optly__push_positionals(&current_cmd->positionals, arg);
+        optly__push_positional(current_cmd, arg);
       }
     } else {
       OptlyCommand *cmd = optly__parse_command(arg, current_cmd->commands);
 
       // TODO: Check if positionals are acceptable @positionals
       if (!cmd) {
-        optly__push_positionals(&current_cmd->positionals, arg);
+        optly__push_positional(current_cmd, arg);
         SHIFT_ARG(argv, argc);
         continue;
       }
@@ -678,6 +727,10 @@ OPTLYDEF OptlyCommand *optly_parse_args(int argc, char *argv[], OptlyCommand *ma
           all_required_flags_present = false;
           LOG_VA(ERROR, "Required flag '--%s' is not present", flag->fullname);
         }
+      }
+
+      if (!optly__validate_positionals(current_cmd)) {
+        all_required_flags_present = false;
       }
 
       current_cmd->next_command = cmd;
@@ -692,6 +745,10 @@ OPTLYDEF OptlyCommand *optly_parse_args(int argc, char *argv[], OptlyCommand *ma
       all_required_flags_present = false;
       LOG_VA(ERROR, "Required flag '--%s' is not present", flag->fullname);
     }
+  }
+
+  if (!optly__validate_positionals(current_cmd)) {
+    all_required_flags_present = false;
   }
 
   if (!all_required_flags_present) {
