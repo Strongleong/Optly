@@ -16,11 +16,11 @@ static OptlyCommand cmd = {
     (OptlyFlag[]){
       // Long (full name)   short name   description (for usage)  Default
       // value           Flag value  type
-      {"verbose", 'v', "Enable verbose output", .value.as_bool = false, OPTLY_TYPE_BOOL},
+      {"verbose", 'v', "Enable verbose output", .value.as_bool = false, .type = OPTLY_TYPE_BOOL},
 
       // Values are unions, so you need to specify member of value with
       // correct type some way
-      {"threads", 't', "Worker threads", {.as_uint32 = 4}, OPTLY_TYPE_UINT32},
+      {"threads", 't', "Worker threads", false, false, {.as_uint32 = 4}, OPTLY_TYPE_UINT32},
 
       // Flag arrays should alwasy ends with NULL_FLAG. Try to not forget
       // about it :)

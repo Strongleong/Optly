@@ -21,7 +21,7 @@ static OptlyCommand cmd = optly_command(
       "build",
       "Build container images",
       optly_flags(
-        optly_flag_string("tags", 't', "Image tag"),
+        optly_flag_string("tags", 't', "Image tag", .required = true),
         optly_flag_string("file", 'f', "Dockerfile path"),
         // NOTE: Here we skipped shortname. -n would not work but --no-cache will
         optly_flag_bool("no-cache", .description = "Disable build cache")
@@ -171,6 +171,14 @@ int main(int argc, char *argv[]) {
   printf("config  = %s\n", optly_flag_value_string(&cmd, "config"));
   printf("env     = %s\n", optly_flag_value_string(&cmd, "env"));
   printf("json    = %s\n", optly_flag_value_bool(&cmd, "json") ? "true" : "false");
+
+  if (cmd.positionals.count > 0) {
+    printf("Positionals:\n");
+  }
+
+  for (size_t i = 0; i < cmd.positionals.count; i++) {
+    printf("%s\n", cmd.positionals.values[i]);
+  }
 
   if (optly_is_command(cmd.next_command, "build")) {
     build(cmd.next_command);

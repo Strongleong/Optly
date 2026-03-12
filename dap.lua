@@ -2,7 +2,7 @@ local dap = require('dap')
 local dapui = require('dapui')
 
 local cwd = vim.fn.getcwd();
-local progname = vim.fn.fnamemodify(cwd, ':t')
+local progname = 'full'
 
 dap.adapters.codelldb = {
   type = 'server',
@@ -20,6 +20,7 @@ dap.configurations.cpp = {
     request = "launch",
     initCommands = { 'platform shell -- ' .. cwd .. '/build.sh -d' },
     program = cwd .. '/out/' .. progname,
+    args = { 'build', '--tags', 'ass' },
     cwd = '${workspaceFolder}',
     stopOnEntry = false,
   },
