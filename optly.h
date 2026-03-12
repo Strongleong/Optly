@@ -639,16 +639,37 @@ static OptlyCommand *optly__parse_command(const char *arg, OptlyCommand *command
 // TODO: spillback (left to right <min>, then right to left <max>)
 static void optly__push_positional(OptlyCommand *cmd, char *value) {
   if (!cmd->positionals) return;
+  size_t pos_count = 0;
 
   for (OptlyPositional *p = cmd->positionals; p->name; p++) {
-    if (p->max == 0 || p->count < p->max) {
+    pos_count++;
+
+    // Ensure at least 1 arg in optioanl positional
+    size_t min = p->min == 0 ? 1 : p->min;
+
+    if (p->count < min) {
       p->values[p->count++] = value;
       return;
     }
   }
 
-  LOG_VA(ERROR, "Too many positional arguments: %s", value);
-  exit(1);
+  for (size_t i = 0; i < pos_count - 1; i++) {
+    OptlyPositional *p      = &cmd->positionals[i];
+    OptlyPositional *p_next = &cmd->positionals[i + 1];
+
+    if (p->count < p->max || p->max == 0) {
+      p->values[p->count++] = p_next->values[0];
+
+      for (size_t i = 0; i < p_next->count - 1; i++) {
+        p_next->values[i] = p_next->values[i + 1];
+      }
+
+      p_next->count--;
+    }
+  }
+
+  OptlyPositional *last_p         = &cmd->positionals[pos_count - 1];
+  last_p->values[last_p->count++] = value;
 }
 
 static bool optly__validate_positionals(OptlyCommand *cmd) {
