@@ -302,6 +302,7 @@ inline bool optly_is_command_null(const OptlyCommand *cmd) {
 #endif  // OPTLY_H
 
 #ifdef OPTLY_IMPLEMENTATION
+
 #include <assert.h>
 #include <ctype.h>
 #include <stdio.h>
@@ -309,12 +310,23 @@ inline bool optly_is_command_null(const OptlyCommand *cmd) {
 #include <string.h>
 #include <strings.h>
 
+#ifndef LOG
+#ifdef LOGCIE
+static const char *logcie_module = "OPTLY";
+#define LOG_VA(lvl, msg, ...) LOGCIE_LOG_VA(lvl, msg, __VA_ARGS__)
+#define LOG(lvl, msg)         LOGCIE_LOG(lvl, msg)
+#else
+#define LOG(lvl, msg) fprintf(stderr, #lvl ": " #msg "\n");
+#define LOG_VA(lvl, msg, ...) fprintf(stderr, #lvl ": " msg "\n", __VA_ARGS__);
+#endif
+#endif
+
 #define SHIFT_ARG(argv, argc) (++(argv), --(argc))
 
-#define UNREACHABLE(message)                                                  \
-  do {                                                                        \
-    fprintf(stderr, "%s:%d: UNREACHABLE: %s\n", __FILE__, __LINE__, message); \
-    abort();                                                                  \
+#define UNREACHABLE(message)                                          \
+  do {                                                                \
+    LOG(FATAL, "%s:%d: UNREACHABLE: %s", __FILE__, __LINE__, message) \
+    abort();                                                          \
   } while (0)
 
 static size_t optly__flag_print_width(OptlyFlag *flags) {
@@ -437,8 +449,8 @@ static bool optly__flag_set_value(OptlyFlag *flag, char *value) {
   assert(flag);
 
   if (flag->type != OPTLY_TYPE_BOOL && !value) {
-    fprintf(stderr, "ERROR: No value for flag --%s", flag->fullname);
-    return false;
+    LOG_VA(FATAL, "Flag --%s requires value", flag->fullname);
+    exit(1);
   }
 
   flag->value.as_int64 = 0;
@@ -492,12 +504,12 @@ static bool optly__flag_set_value(OptlyFlag *flag, char *value) {
   }
 
   if (*end != '\0') {
-    fprintf(stderr, "ERROR: Argument '%s' is not a number (%s)\n", flag->fullname, value);
+    LOG_VA(ERROR, "Argument '%s' is not a number (%s)", flag->fullname, value);
     return false;
   }
 
   if (flag->type == OPTLY_TYPE_BOOL && flag->value.as_int8 == -1) {
-    fprintf(stderr, "Invalid boolean value for flag '%s': %s\n", flag->fullname, value);
+    LOG_VA(ERROR, "Invalid boolean value for flag '%s': %s", flag->fullname, value);
     return false;
   }
 
@@ -535,12 +547,12 @@ static void optly__parse_flags(char ***argv_ptr, int *argc_ptr, OptlyFlag *flags
       OptlyFlag *flag = optly__find_flag(sarg, flags);
 
       if (!flag) {
-        fprintf(stderr, "Unknown short flag: %s\n", sarg);
+        LOG_VA(WARN, "Unknown short flag: %s", sarg);
         continue;
       }
 
       if (flag->type != OPTLY_TYPE_BOOL) {
-        fprintf(stderr, "Error: cannot batch non-boolean flags (invalid flag in %s)\n", arg);
+        LOG_VA(WARN, "cannot batch non-boolean flags (invalid flag in %s)", sarg);
         continue;
       }
 
@@ -574,7 +586,7 @@ static void optly__parse_flags(char ***argv_ptr, int *argc_ptr, OptlyFlag *flags
   OptlyFlag *flag = optly__find_flag(arg, flags);
 
   if (!flag) {
-    fprintf(stderr, "Unknown flag: %s\n", arg);
+    LOG_VA(WARN, "Unknown flag: %s", arg);
     return;
   }
 
@@ -587,7 +599,7 @@ static void optly__parse_flags(char ***argv_ptr, int *argc_ptr, OptlyFlag *flags
   }
 
   if (!optly__flag_set_value(flag, value)) {
-    fprintf(stderr, "Failed to set value for flag: %s\n", arg);
+    LOG_VA(ERROR, "Failed to set value for flag: %s\n", arg);
   }
 
   *argv_ptr = argv;
@@ -661,11 +673,10 @@ OPTLYDEF OptlyCommand *optly_parse_args(int argc, char *argv[], OptlyCommand *ma
         continue;
       }
 
-
       for (OptlyFlag *flag = current_cmd->flags; !optly_is_flag_null(flag); flag++) {
         if (flag->required && !flag->present) {
           all_required_flags_present = false;
-          fprintf(stderr, "ERROR: Required flag '--%s' is not present\n", flag->fullname);
+          LOG_VA(ERROR, "Required flag '--%s' is not present", flag->fullname);
         }
       }
 
@@ -679,7 +690,7 @@ OPTLYDEF OptlyCommand *optly_parse_args(int argc, char *argv[], OptlyCommand *ma
   for (OptlyFlag *flag = current_cmd->flags; !optly_is_flag_null(flag); flag++) {
     if (flag->required && !flag->present) {
       all_required_flags_present = false;
-      fprintf(stderr, "ERROR: Required flag '--%s' is not present\n", flag->fullname);
+      LOG_VA(ERROR, "Required flag '--%s' is not present", flag->fullname);
     }
   }
 
