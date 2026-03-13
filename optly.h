@@ -653,23 +653,25 @@ static void optly__push_positional(OptlyCommand *cmd, char *value) {
     }
   }
 
-  for (size_t i = 0; i < pos_count - 1; i++) {
-    OptlyPositional *p      = &cmd->positionals[i];
-    OptlyPositional *p_next = &cmd->positionals[i + 1];
-
-    if (p->count < p->max || p->max == 0) {
-      p->values[p->count++] = p_next->values[0];
-
-      for (size_t i = 0; i < p_next->count - 1; i++) {
-        p_next->values[i] = p_next->values[i + 1];
-      }
-
-      p_next->count--;
-    }
-  }
-
   OptlyPositional *last_p         = &cmd->positionals[pos_count - 1];
   last_p->values[last_p->count++] = value;
+
+  for (size_t i = pos_count - 1; i > 1; i--) {
+    OptlyPositional *p      = &cmd->positionals[i];
+    OptlyPositional *p_prev = &cmd->positionals[i - 1];
+
+    LOG(INFO, "67");
+
+    if (p->count > p->max && p->max != 0) {
+      p_prev->values[p_prev->count++] = p->values[0];
+
+      for (size_t i = 0; i < p->count - 1; i++) {
+        p->values[i] = p->values[i + 1];
+      }
+
+      p->count--;
+    }
+  }
 }
 
 static bool optly__validate_positionals(OptlyCommand *cmd) {
