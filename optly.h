@@ -306,6 +306,8 @@ OPTLYDEF double   optly_double(OptlyCommand *command, const char *name);
 
 OPTLYDEF bool optly_is_command(OptlyCommand *command, const char *name);
 
+OPTLYDEF OptlyPositional *optly_get_positional(OptlyCommand *command, const char *name);
+
 inline bool optly_is_flag_null(const OptlyFlag *flag) {
   return flag == NULL || (flag->fullname == NULL && flag->shortname == 0);
 }
@@ -321,7 +323,6 @@ inline bool optly_is_command_null(const OptlyCommand *cmd) {
 #ifdef OPTLY_IMPLEMENTATION
 
 #include <assert.h>
-#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -574,7 +575,7 @@ static void optly__parse_flags(char ***argv_ptr, int *argc_ptr, OptlyFlag *flags
   flag->present = true;
 
   // If no value provided inline and next arg looks like a value (not a flag)
-  if (!value &&  flag->type != OPTLY_TYPE_BOOL && argc > 1 && argv[1][0] != '-') {
+  if (!value && flag->type != OPTLY_TYPE_BOOL && argc > 1 && argv[1][0] != '-') {
     value = argv[1];
     SHIFT_ARG(argv, argc);
   }
