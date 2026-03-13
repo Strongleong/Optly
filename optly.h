@@ -486,47 +486,11 @@ static bool optly__flag_set_value(OptlyFlag *flag, char *value) {
     case OPTLY_TYPE_UINT64: flag->value.as_uint64 = strtoll(value, &end, 10); break;
     case OPTLY_TYPE_FLOAT:  flag->value.as_float = strtod(value, &end); break;
     case OPTLY_TYPE_DOUBLE: flag->value.as_double = strtod(value, &end); break;
-
-    case OPTLY_TYPE_BOOL:   {
-      if (!value) {
-        flag->value.as_bool = true;
-        break;
-      }
-
-      char   lower[8];
-      size_t len = strlen(value);
-
-      if (len >= sizeof(lower)) {
-        len = sizeof(lower) - 1;
-      }
-
-      for (size_t i = 0; i < len; i++) {
-        lower[i] = (char)tolower((unsigned char)value[i]);
-      }
-
-      lower[len] = '\0';
-
-      if (strcmp(lower, "true") == 0 || strcmp(lower, "t") == 0 ||
-          strcmp(lower, "yes") == 0 || strcmp(lower, "y") == 0) {
-        flag->value.as_bool = true;
-      } else if (strcmp(lower, "false") == 0 || strcmp(lower, "f") == 0 ||
-                 strcmp(lower, "no") == 0 || strcmp(lower, "n") == 0) {
-        flag->value.as_bool = false;
-      } else {
-        flag->value.as_int8 = -1;
-      }
-
-      break;
-    }
+    case OPTLY_TYPE_BOOL:   flag->value.as_bool = true; break;
   }
 
   if (*end != '\0') {
     LOG_VA(ERROR, "Argument '%s' is not a number (%s)", flag->fullname, value);
-    return false;
-  }
-
-  if (flag->type == OPTLY_TYPE_BOOL && flag->value.as_int8 == -1) {
-    LOG_VA(ERROR, "Invalid boolean value for flag '%s': %s", flag->fullname, value);
     return false;
   }
 
@@ -610,7 +574,7 @@ static void optly__parse_flags(char ***argv_ptr, int *argc_ptr, OptlyFlag *flags
   flag->present = true;
 
   // If no value provided inline and next arg looks like a value (not a flag)
-  if (!value && argc > 1 && argv[1][0] != '-') {
+  if (!value &&  flag->type != OPTLY_TYPE_BOOL && argc > 1 && argv[1][0] != '-') {
     value = argv[1];
     SHIFT_ARG(argv, argc);
   }
