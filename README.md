@@ -94,7 +94,7 @@ Flags arrays are always **NULL-terminated** using `NULL_FLAG`.
 
 #### Supported types
 
-- `OPTLY_TYPE_BOOL` → for switches. Will be `true` if flag is present, or whatever default you give. You can also explicitly pass values like `yes/no`, `y/n`, `true/false`, `t/f`, `1/0`.
+- `OPTLY_TYPE_BOOL` → for switches. Will be `true` if flag is present, or whatever default you give.
 - `OPTLY_TYPE_CHAR` → stores a single character. Takes first character of the provided string.
 - `OPTLY_TYPE_STRING` → takes a string argument as-is.
 - `OPTLY_TYPE_INT8` / `OPTLY_TYPE_INT16` / `OPTLY_TYPE_INT32` / `OPTLY_TYPE_INT64` → signed integer types of different widths.
@@ -102,10 +102,8 @@ Flags arrays are always **NULL-terminated** using `NULL_FLAG`.
 - `OPTLY_TYPE_FLOAT` → single-precision floating point.
 - `OPTLY_TYPE_DOUBLE` → double-precision floating point.
 
-All flag types (except implicit booleans) accept arguments in the form `--flag=value` or `--flag value`.
+All flag types (except booleans) accept arguments in the form `--flag=value` or `--flag value`.
 If conversion fails (e.g. passing `--int=hello`), optly prints an error.
-
-Flags with type `OPTLY_TYPE_BOOL` are special: they don’t require a value. Writing just `--verbose` is enough to flip them on. But if you really want, you can still do `--verbose=false` or `-v no`.
 
 ---
 
