@@ -636,7 +636,6 @@ static OptlyCommand *optly__parse_command(const char *arg, OptlyCommand *command
   return NULL;
 }
 
-// TODO: spillback (left to right <min>, then right to left <max>)
 static void optly__push_positional(OptlyCommand *cmd, char *value) {
   if (!cmd->positionals) return;
   size_t pos_count = 0;
@@ -736,7 +735,6 @@ OPTLYDEF OptlyCommand *optly_parse_args(int argc, char *argv[], OptlyCommand *ma
     } else {
       OptlyCommand *cmd = optly__parse_command(arg, current_cmd->commands);
 
-      // TODO: Check if positionals are acceptable @positionals
       if (!cmd) {
         optly__push_positional(current_cmd, arg);
         SHIFT_ARG(argv, argc);
@@ -859,10 +857,19 @@ inline OPTLYDEF bool optly_is_command(OptlyCommand *command, const char *name) {
   return command && strcmp(command->name, name) == 0;
 }
 
+inline OPTLYDEF OptlyPositional *optly_get_positional(OptlyCommand *command, const char *name) {
+  for (OptlyPositional *p = command->positionals; p->name; p++) {
+    if (strcmp(p->name, name) == 0) {
+      return p;
+    }
+  }
+
+  return NULL;
+}
+
 #endif  // OPTLY_IMPLEMENTATION
 
 // TODO: Add auto `command --help|-h` and `help command`
-// TODO: Name and description for positionals @positionals
 // TODO: Add ability to ignore unknown flags @disable_warnings
 // TODO: Add ability to disable error messages @disable_warnings (logcie?)
 // TODO: Should I print type of flag value in usage? @print_flag_type

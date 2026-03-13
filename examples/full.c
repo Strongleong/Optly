@@ -25,6 +25,9 @@ static OptlyCommand cmd = optly_command(
         optly_flag_string("file", 'f', "Dockerfile path"),
         // NOTE: Here we skipped shortname. -n would not work but --no-cache will
         optly_flag_bool("no-cache", .description = "Disable build cache")
+      ),
+      .positionals = optly_positionals(
+        optly_positional("context", "Build context directory", 1, 1)
       )
     ),
 
@@ -45,26 +48,9 @@ static OptlyCommand cmd = optly_command(
             optly_flag_uint32("revision", 'r', "Revision to rollabck to")
           )
         )
-      )
-    ),
-
-    optly_command(
-      "deploy",
-      "Deploy service",
-      optly_flags(
-        optly_flag_uint32("replicas", 'r', "Number of replicas"),
-        optly_flag_bool("wait", 'w', "Wait for deployment finishes")
       ),
-      optly_commands(
-        optly_command("status", "Get status of deployed service")
-      )
-    ),
-
-    optly_command(
-      "rollback",
-      "Rollback service",
-      optly_flags(
-        optly_flag("revision", 'r', "Revision to rollabck to")
+      optly_positionals(
+        optly_positional("service", "Service name", 1, 1)
       )
     ),
 
@@ -75,6 +61,11 @@ static OptlyCommand cmd = optly_command(
         optly_flag_bool("follow", 'f', "Follow log output"),
         optly_flag_uint32("lines", 'n', "Number of lines ", .value.as_uint32 = 20),
         optly_flag_uint32("since", 's', "Show logs scinse timestamp")
+      ),
+      .positionals = optly_positionals(
+        // NOTE: min = 0 means if no service provided, then pull from all.
+        //       max = 0 menas get as much as possible (like in cp command: cp file1 file2 ... fileN dst)
+        optly_positional("services", "Services to pull logs from", 0, 0)
       )
     ),
 
@@ -91,6 +82,9 @@ static OptlyCommand cmd = optly_command(
         ),
         optly_command("stop", NULL),
         optly_command("restart", NULL)
+      ),
+      .positionals = optly_positionals(
+        optly_positional("service", "Service name", 0, 1)
       )
     )
   )
@@ -101,6 +95,12 @@ void build(OptlyCommand *cmd) {
   printf("tags     = %s\n", optly_flag_value_string(cmd, "tags"));
   printf("file     = %s\n", optly_flag_value_string(cmd, "file"));
   printf("no-cache = %s\n", optly_flag_value_bool(cmd, "no-cache") ? "true" : "false");
+
+  OptlyPositional *context = optly_get_positional(cmd, "context");
+
+  if (context) {
+    printf("Context: %s\n", *context->values);
+  }
 }
 
 void rollback(OptlyCommand *cmd) {
@@ -114,9 +114,14 @@ void status(OptlyCommand *cmd) {
 }
 
 void deploy(OptlyCommand *cmd) {
-  printf("Logs command flags:\n");
+  printf("Deploy command flags:\n");
   printf("replicas = %d\n", optly_flag_value_uint32(cmd, "replicas"));
   printf("wait     = %s\n", optly_flag_value_bool(cmd, "wait") ? "true" : "false");
+
+  OptlyPositional *service = optly_get_positional(cmd, "service");
+  printf("Service: %s\n", *service->values);
+
+  printf("\n");
 
   if (optly_is_command(cmd->next_command, "rollback")) {
     rollback(cmd->next_command);
@@ -132,6 +137,18 @@ void logs(OptlyCommand *cmd) {
   printf("follow   = %s\n", optly_flag_value_bool(cmd, "follow") ? "true" : "false");
   printf("lines    = %d\n", optly_flag_value_uint32(cmd, "lines"));
   printf("since    = %d\n", optly_flag_value_uint32(cmd, "since"));
+
+  OptlyPositional *services = optly_get_positional(cmd, "services");
+
+  if (services && services->count > 0) {
+    printf("Services: ");
+
+    for (size_t i = 0; i < services->count - 1; i++) {
+      printf("%s, ", services->values[i]);
+    }
+
+    printf("%s\n", services->values[services->count - 1]);
+  }
 }
 
 void start(OptlyCommand *cmd) {
@@ -151,6 +168,15 @@ void restart(OptlyCommand *cmd) {
 
 void services(OptlyCommand *cmd) {
   printf("Service command have no flags.\n");
+  printf("But it have positionals:\n");
+
+  OptlyPositional *service = optly_get_positional(cmd, "service");
+
+  if (service) {
+    printf("Service: %s\n", *service->values);
+  }
+
+  printf("\n");
 
   if (optly_is_command(cmd->next_command, "start")) {
     start(cmd->next_command);
@@ -171,14 +197,7 @@ int main(int argc, char *argv[]) {
   printf("config  = %s\n", optly_flag_value_string(&cmd, "config"));
   printf("env     = %s\n", optly_flag_value_string(&cmd, "env"));
   printf("json    = %s\n", optly_flag_value_bool(&cmd, "json") ? "true" : "false");
-
-  if (cmd.positionals->count > 0) {
-    printf("Positionals:\n");
-  }
-
-  for (size_t i = 0; i < cmd.positionals->count; i++) {
-    printf("%s\n", cmd.positionals->values[i]);
-  }
+  printf("\n");
 
   if (optly_is_command(cmd.next_command, "build")) {
     build(cmd.next_command);
@@ -186,7 +205,7 @@ int main(int argc, char *argv[]) {
     deploy(cmd.next_command);
   } else if (optly_is_command(cmd.next_command, "logs")) {
     logs(cmd.next_command);
-  } else if (optly_is_command(cmd.next_command, "services")) {
+  } else if (optly_is_command(cmd.next_command, "service")) {
     services(cmd.next_command);
   } else if (optly_is_command(cmd.next_command, "stop")) {
     printf("this will never reach it here, 'stop' command is subcommand of 'service' command\n");
