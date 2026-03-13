@@ -1,5 +1,5 @@
 /*
-  optly.h — v1.1.0
+  optly.h — v1.2.0
   Single-header command line argument parser for C.
 
   Features
@@ -158,6 +158,16 @@
 #ifndef OPTLYDEF
 #define OPTLYDEF
 #endif  // OPTLYDEF
+
+// Versioning macros
+#define OPTLY_VERSION_MAJOR         1
+#define OPTLY_VERSION_MINOR         2
+#define OPTLY_VERSION_RELEASE       0
+#define OPTLY_VERSION_NUMBER        (OPTLY_VERSION_MAJOR * 100 * 100 + OPTLY_VERSION_MINOR * 100 + OPTLY_VERSION_RELEASE)
+#define OPTLY_VERSION_FULL          OPTLY_VERSION_MAJOR.OPTLY_VERSION_MINOR.OPTLY_VERSION_RELEASE
+#define OPTLY_QUOTE(str)            #str
+#define OPTLY_EXPAND_AND_QUOTE(str) OPTLY_QUOTE(str)
+#define OPTLY_VERSION_STRING        OPTLY_EXPAND_AND_QUOTE(OPTLY_VERSION_FULL)
 
 // if you need more than 512 args per ONE command you should look in the mirror really deep
 #define MAX_FLAGS_LENGTH      512
