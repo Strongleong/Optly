@@ -1,5 +1,5 @@
 /*
-  optly.h — v1.1.0
+  optly.h — v1.2.0
   Single-header command line argument parser for C.
 
   Features
@@ -159,6 +159,16 @@
 #define OPTLYDEF
 #endif  // OPTLYDEF
 
+// Versioning macros
+#define OPTLY_VERSION_MAJOR         1
+#define OPTLY_VERSION_MINOR         2
+#define OPTLY_VERSION_RELEASE       0
+#define OPTLY_VERSION_NUMBER        (OPTLY_VERSION_MAJOR * 100 * 100 + OPTLY_VERSION_MINOR * 100 + OPTLY_VERSION_RELEASE)
+#define OPTLY_VERSION_FULL          OPTLY_VERSION_MAJOR.OPTLY_VERSION_MINOR.OPTLY_VERSION_RELEASE
+#define OPTLY_QUOTE(str)            #str
+#define OPTLY_EXPAND_AND_QUOTE(str) OPTLY_QUOTE(str)
+#define OPTLY_VERSION_STRING        OPTLY_EXPAND_AND_QUOTE(OPTLY_VERSION_FULL)
+
 // if you need more than 512 args per ONE command you should look in the mirror really deep
 #define MAX_FLAGS_LENGTH      512
 // same with positional arguments
@@ -214,9 +224,15 @@ typedef struct {
 } OptlyFlag;
 
 typedef struct {
+  char *name;
+  char *description;
+
+  size_t min;
+  size_t max;
+
   char  *values[OPTLY_MAX_POSITIONALS];
   size_t count;
-} OptlyPositionals;
+} OptlyPositional;
 
 typedef struct OptlyCommand OptlyCommand;
 struct OptlyCommand {
@@ -225,12 +241,14 @@ struct OptlyCommand {
 
   OptlyFlag       *flags;
   OptlyCommand    *commands;
-  OptlyCommand    *next_command;
-  OptlyPositionals positionals;
+  OptlyPositional *positionals;
+
+  OptlyCommand *next_command;
 };
 
-#define NULL_FLAG    {.fullname = NULL, .shortname = 0, .value = {.as_int64 = 0}, .type = 0}
-#define NULL_COMMAND {.name = NULL, .flags = NULL}
+#define NULL_FLAG       {.fullname = NULL, .shortname = 0, .value = {.as_int64 = 0}, .type = 0}
+#define NULL_COMMAND    {.name = NULL, .flags = NULL}
+#define NULL_POSITIONAL {.name = NULL}
 
 // NOTE: Forcing designated initializer to automatically zero initialize missing fields
 #define optly_flag(name, ...)        \
@@ -250,6 +268,15 @@ struct OptlyCommand {
 #define optly_commands(...)   \
   (OptlyCommand[]) {          \
     __VA_ARGS__, NULL_COMMAND \
+  }
+
+#define optly_positional(namme, ...) \
+  (OptlyPositional) {                \
+    .name = (namme), __VA_ARGS__     \
+  }
+#define optly_positionals(...)   \
+  (OptlyPositional[]) {          \
+    __VA_ARGS__, NULL_POSITIONAL \
   }
 
 #define optly_flag_bool(name, ...)   optly_flag(name, __VA_ARGS__, .type = OPTLY_TYPE_BOOL)
@@ -289,6 +316,8 @@ OPTLYDEF double   optly_double(OptlyCommand *command, const char *name);
 
 OPTLYDEF bool optly_is_command(OptlyCommand *command, const char *name);
 
+OPTLYDEF OptlyPositional *optly_get_positional(OptlyCommand *command, const char *name);
+
 inline bool optly_is_flag_null(const OptlyFlag *flag) {
   return flag == NULL || (flag->fullname == NULL && flag->shortname == 0);
 }
@@ -304,7 +333,6 @@ inline bool optly_is_command_null(const OptlyCommand *cmd) {
 #ifdef OPTLY_IMPLEMENTATION
 
 #include <assert.h>
-#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -316,7 +344,7 @@ static const char *logcie_module = "OPTLY";
 #define LOG_VA(lvl, msg, ...) LOGCIE_LOG_VA(lvl, msg, __VA_ARGS__)
 #define LOG(lvl, msg)         LOGCIE_LOG(lvl, msg)
 #else
-#define LOG(lvl, msg) fprintf(stderr, #lvl ": " #msg "\n");
+#define LOG(lvl, msg)         fprintf(stderr, #lvl ": " #msg "\n");
 #define LOG_VA(lvl, msg, ...) fprintf(stderr, #lvl ": " msg "\n", __VA_ARGS__);
 #endif
 #endif
@@ -469,47 +497,11 @@ static bool optly__flag_set_value(OptlyFlag *flag, char *value) {
     case OPTLY_TYPE_UINT64: flag->value.as_uint64 = strtoll(value, &end, 10); break;
     case OPTLY_TYPE_FLOAT:  flag->value.as_float = strtod(value, &end); break;
     case OPTLY_TYPE_DOUBLE: flag->value.as_double = strtod(value, &end); break;
-
-    case OPTLY_TYPE_BOOL:   {
-      if (!value) {
-        flag->value.as_bool = true;
-        break;
-      }
-
-      char   lower[8];
-      size_t len = strlen(value);
-
-      if (len >= sizeof(lower)) {
-        len = sizeof(lower) - 1;
-      }
-
-      for (size_t i = 0; i < len; i++) {
-        lower[i] = (char)tolower((unsigned char)value[i]);
-      }
-
-      lower[len] = '\0';
-
-      if (strcmp(lower, "true") == 0 || strcmp(lower, "t") == 0 ||
-          strcmp(lower, "yes") == 0 || strcmp(lower, "y") == 0) {
-        flag->value.as_bool = true;
-      } else if (strcmp(lower, "false") == 0 || strcmp(lower, "f") == 0 ||
-                 strcmp(lower, "no") == 0 || strcmp(lower, "n") == 0) {
-        flag->value.as_bool = false;
-      } else {
-        flag->value.as_int8 = -1;
-      }
-
-      break;
-    }
+    case OPTLY_TYPE_BOOL:   flag->value.as_bool = true; break;
   }
 
   if (*end != '\0') {
     LOG_VA(ERROR, "Argument '%s' is not a number (%s)", flag->fullname, value);
-    return false;
-  }
-
-  if (flag->type == OPTLY_TYPE_BOOL && flag->value.as_int8 == -1) {
-    LOG_VA(ERROR, "Invalid boolean value for flag '%s': %s", flag->fullname, value);
     return false;
   }
 
@@ -593,7 +585,7 @@ static void optly__parse_flags(char ***argv_ptr, int *argc_ptr, OptlyFlag *flags
   flag->present = true;
 
   // If no value provided inline and next arg looks like a value (not a flag)
-  if (!value && argc > 1 && argv[1][0] != '-') {
+  if (!value && flag->type != OPTLY_TYPE_BOOL && argc > 1 && argv[1][0] != '-') {
     value = argv[1];
     SHIFT_ARG(argv, argc);
   }
@@ -619,87 +611,65 @@ static OptlyCommand *optly__parse_command(const char *arg, OptlyCommand *command
   return NULL;
 }
 
-static void optly__push_positionals(OptlyPositionals *positionals, char *value) {
-  assert(positionals->count < OPTLY_MAX_POSITIONALS);
-  positionals->values[positionals->count++] = value;
+static void optly__push_positional(OptlyCommand *cmd, char *value) {
+  if (!cmd->positionals) return;
+  size_t pos_count = 0;
+
+  for (OptlyPositional *p = cmd->positionals; p->name; p++) {
+    pos_count++;
+
+    // Ensure at least 1 arg in optioanl positional
+    size_t min = p->min == 0 ? 1 : p->min;
+
+    if (p->count < min) {
+      p->values[p->count++] = value;
+      return;
+    }
+  }
+
+  OptlyPositional *last_p         = &cmd->positionals[pos_count - 1];
+  last_p->values[last_p->count++] = value;
+
+  for (size_t i = pos_count - 1; i > 1; i--) {
+    OptlyPositional *p      = &cmd->positionals[i];
+    OptlyPositional *p_prev = &cmd->positionals[i - 1];
+
+    if (p->count > p->max && p->max != 0) {
+      p_prev->values[p_prev->count++] = p->values[0];
+
+      for (size_t i = 0; i < p->count - 1; i++) {
+        p->values[i] = p->values[i + 1];
+      }
+
+      p->count--;
+    }
+  }
 }
 
-/**
- * Parse OPTLY arguments.
- */
-OPTLYDEF OptlyCommand *optly_parse_args(int argc, char *argv[], OptlyCommand *main_cmd) {
-  assert(argc > 0);
-
-  if (main_cmd->name == NULL) {
-    main_cmd->name = argv[0];
+static bool optly__validate_positionals(OptlyCommand *cmd) {
+  if (!cmd->positionals) {
+    return true;
   }
 
-  OptlyCommand *current_cmd = main_cmd;
+  bool ok = true;
 
-  bool positional_only            = false;
-  bool all_required_flags_present = true;
-
-  SHIFT_ARG(argv, argc);
-
-  while (argc > 0) {
-    char *arg = *argv;
-
-    if (!arg) {
-      break;
+  for (OptlyPositional *pos = cmd->positionals; pos->name; pos++) {
+    if (pos->count < pos->min) {
+      LOG_VA(ERROR, "Not enough values for positional '%s'", pos->name);
+      ok = false;
     }
 
-    if (positional_only) {
-      optly__push_positionals(&current_cmd->positionals, arg);
-      SHIFT_ARG(argv, argc);
-      continue;
-    }
-
-    if (arg[0] == '-') {
-      if (arg[1] == '-' && arg[2] == '\0') {
-        // `--` encountered
-        positional_only = true;
-      } else if (current_cmd->flags) {
-        optly__parse_flags(&argv, &argc, current_cmd->flags);
-      } else {
-        optly__push_positionals(&current_cmd->positionals, arg);
-      }
-    } else {
-      OptlyCommand *cmd = optly__parse_command(arg, current_cmd->commands);
-
-      // TODO: Check if positionals are acceptable @positionals
-      if (!cmd) {
-        optly__push_positionals(&current_cmd->positionals, arg);
-        SHIFT_ARG(argv, argc);
-        continue;
-      }
-
-      for (OptlyFlag *flag = current_cmd->flags; !optly_is_flag_null(flag); flag++) {
-        if (flag->required && !flag->present) {
-          all_required_flags_present = false;
-          LOG_VA(ERROR, "Required flag '--%s' is not present", flag->fullname);
-        }
-      }
-
-      current_cmd->next_command = cmd;
-      current_cmd               = current_cmd->next_command;
-    }
-
-    SHIFT_ARG(argv, argc);
-  }
-
-  for (OptlyFlag *flag = current_cmd->flags; !optly_is_flag_null(flag); flag++) {
-    if (flag->required && !flag->present) {
-      all_required_flags_present = false;
-      LOG_VA(ERROR, "Required flag '--%s' is not present", flag->fullname);
+    if (pos->max != 0 && pos->count > pos->max) {
+      LOG_VA(ERROR, "Too many values for positional '%s'", pos->name);
+      ok = false;
     }
   }
 
-  if (!all_required_flags_present) {
-    exit(1);
-  }
+  return ok;
+}
 
-  current_cmd->next_command = NULL;
-  return main_cmd;
+inline OPTLYDEF bool optly_is_command(OptlyCommand *command, const char *name) {
+  return command && strcmp(command->name, name) == 0;
 }
 
 OptlyFlag *optly_get_flag(OptlyFlag *flags, const char *name) {
@@ -777,22 +747,110 @@ inline OPTLYDEF double optly_flag_value_double(OptlyCommand *command, const char
   return flag ? flag->value.as_double : 0;
 }
 
-inline OPTLYDEF bool optly_is_command(OptlyCommand *command, const char *name) {
-  return command && strcmp(command->name, name) == 0;
+inline OPTLYDEF OptlyPositional *optly_get_positional(OptlyCommand *command, const char *name) {
+  for (OptlyPositional *p = command->positionals; p->name; p++) {
+    if (strcmp(p->name, name) == 0) {
+      return p;
+    }
+  }
+
+  return NULL;
+}
+
+/**
+ * Parse OPTLY arguments.
+ */
+OPTLYDEF OptlyCommand *optly_parse_args(int argc, char *argv[], OptlyCommand *main_cmd) {
+  assert(argc > 0);
+
+  if (main_cmd->name == NULL) {
+    main_cmd->name = argv[0];
+  }
+
+  OptlyCommand *current_cmd = main_cmd;
+
+  bool positional_only            = false;
+  bool all_required_flags_present = true;
+
+  SHIFT_ARG(argv, argc);
+
+  while (argc > 0) {
+    char *arg = *argv;
+
+    if (!arg) {
+      break;
+    }
+
+    if (positional_only) {
+      optly__push_positional(current_cmd, arg);
+      SHIFT_ARG(argv, argc);
+      continue;
+    }
+
+    if (arg[0] == '-') {
+      if (arg[1] == '-' && arg[2] == '\0') {
+        // `--` encountered
+        positional_only = true;
+      } else if (current_cmd->flags) {
+        optly__parse_flags(&argv, &argc, current_cmd->flags);
+      } else {
+        optly__push_positional(current_cmd, arg);
+      }
+    } else {
+      OptlyCommand *cmd = optly__parse_command(arg, current_cmd->commands);
+
+      if (!cmd) {
+        optly__push_positional(current_cmd, arg);
+        SHIFT_ARG(argv, argc);
+        continue;
+      }
+
+      for (OptlyFlag *flag = current_cmd->flags; !optly_is_flag_null(flag); flag++) {
+        if (flag->required && !flag->present) {
+          all_required_flags_present = false;
+          LOG_VA(ERROR, "Required flag '--%s' is not present", flag->fullname);
+        }
+      }
+
+      if (!optly__validate_positionals(current_cmd)) {
+        all_required_flags_present = false;
+      }
+
+      current_cmd->next_command = cmd;
+      current_cmd               = current_cmd->next_command;
+    }
+
+    SHIFT_ARG(argv, argc);
+  }
+
+  for (OptlyFlag *flag = current_cmd->flags; !optly_is_flag_null(flag); flag++) {
+    if (flag->required && !flag->present) {
+      all_required_flags_present = false;
+      LOG_VA(ERROR, "Required flag '--%s' is not present", flag->fullname);
+    }
+  }
+
+  if (!optly__validate_positionals(current_cmd)) {
+    all_required_flags_present = false;
+  }
+
+  if (!all_required_flags_present) {
+    exit(1);
+  }
+
+  current_cmd->next_command = NULL;
+  return main_cmd;
 }
 
 #endif  // OPTLY_IMPLEMENTATION
 
 // TODO: Add auto `command --help|-h` and `help command`
-// TODO: Name and description for positionals @positionals
-// TODO: Add ability to ignore unknown flags @disable_warnings
-// TODO: Add ability to disable error messages @disable_warnings (logcie?)
 // TODO: Should I print type of flag value in usage? @print_flag_type
-// TODO: Support different kind of numbers (0xBABA, 0123)?
 // TODO: Usage and version string customisation (usage per command)
+// TODO: Types for variadics?
+// TODO: Support different kind of numbers (0xBABA, 0123)?
 // TODO: Return state? errors? from optly_parse_args
 // TODO: Come up with a way to automatically choose field for .value in optly_flag
-// TODO: Turn bools in OptlyFlag into bit flags one day
 
 /*
    ------------------------------------------------------------------------------
