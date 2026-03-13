@@ -660,8 +660,6 @@ static void optly__push_positional(OptlyCommand *cmd, char *value) {
     OptlyPositional *p      = &cmd->positionals[i];
     OptlyPositional *p_prev = &cmd->positionals[i - 1];
 
-    LOG(INFO, "67");
-
     if (p->count > p->max && p->max != 0) {
       p_prev->values[p_prev->count++] = p->values[0];
 
