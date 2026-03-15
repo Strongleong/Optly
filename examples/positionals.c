@@ -1,5 +1,8 @@
+#include <stdio.h>
+
 #define OPTLY_IMPLEMENTATION
 #include "optly.h"
+
 static OptlyCommand cmd = {
   .name = NULL,
   .description = NULL,
