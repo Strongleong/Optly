@@ -1,190 +1,166 @@
 # Optly
 
-My own single file header-only library for handling parsing CLI arguments
+Optly is a **single-header command line argument parser for C (C99)**.
 
-It supports parsing flags with different "styles":
- - `./app --flag --another`
- - `./app -f -a`
- - `./app -fa`
- - `./app --value 123`
- - `./app --value=123`
- - `./app -v 123`
- - `./app -v=123`
+It is designed to be **small, dependency‑free, and allocation‑free**,
+making it ideal for small CLI tools and embedded-style programs.
 
-Note that mixing "batch" args and args with values like this (`./app -fav=123`) is not supported and can lead to unexpected results
+## Features
 
-Also this Optly supports commands and its flags:
+-   Single-header library
+-   No dynamic memory allocation
+-   Portable C99
+-   Commands and nested subcommands
+-   Command-specific flags
+-   Long flags (`--verbose`)
+-   Short flags (`-v`)
+-   Batched short flags (`-abc`)
+-   Inline flag values (`--threads=4`)
+-   Separate flag values (`--threads 4`)
+-   Typed flag values
+-   Positional arguments
+-   Optional and required flags
 
- - `./app list`
- - `./app download -u example.com`
+# Installation
 
-Subcommands (like `./app list help`) and positional arguments are not implemented yet
+Just drop `optly.h` into your project.
 
-## How to use
+In **one C file**:
 
-Here is basic example ([./examples/simple.c](./examples/simple.c)):
-
-```c
+``` c
 #define OPTLY_IMPLEMENTATION
-#include <optly.h>
+#include "optly.h"
+```
 
+In other files:
+
+``` c
+#include "optly.h"
+```
+
+# Example
+
+``` c
+#define OPTLY_IMPLEMENTATION
+#include "optly.h"
 #include <stdio.h>
 
-static OptlyFlag flags[] = {
-  { "value",  'v', {0},     OPTLY_TYPE_UINT32 },
-  { "switch", 's', {false}, OPTLY_TYPE_BOOL },
-  NULL_FLAG,
+static OptlyCommand cmd = {
+  .name = "app",
+
+  .flags = optly_flags(
+    optly_flag_bool("verbose", 'v', "Enable verbose output", .value.as_bool = false),
+    optly_flag_uint32("threads", 't', "Worker threads", .value.as_uint32 = 4)
+  ),
+
+  .commands = optly_commands(
+    optly_command("run", "Run server",
+      .flags = optly_flags(
+        optly_flag_uint16("port", 'p', "Server port", .value.as_uint16 = 8080)
+      )
+    )
+  )
 };
 
-static OptlyFlag download_flags[] = {
-  { "url",    'u', {NULL},  OPTLY_TYPE_STRING },
-  { "switch", 's', {false}, OPTLY_TYPE_BOOL },
-  NULL_FLAG,
-};
+int main(int argc, char **argv)
+{
+  optly_parse_args(argc, argv, &cmd);
 
-static OptlyCommand commands[] = {
-  { "help",     { NULL } },
-  { "download", {download_flags} },
-  NULL_COMMAND,
-};
+  printf("threads: %u\n", optly_uint32(&cmd, "threads"));
 
-int main(int argc, char *argv[]) {
-  OptlyArgs args = optly_parse_args(argc, argv, flags, commands);
-
-  if (flags[2].value.as_bool || args.command == &commands[0]) {
-    optly_usage(args.bin_path, commands, flags);
-    return 0;
+  if (cmd.next_command) {
+    printf("command: %s\n", cmd.next_command->name);
+    printf("port: %u\n", optly_uint16(cmd.next_command, "port"));
   }
-
-  printf("Binary: %s\n", args.bin_path);
-
-  if (args.command) {
-    if (args.command == &commands[1]) {
-      optly_usage(args.bin_path, commands, flags);
-    }
-
-    printf("Command: %s\n", args.command->name);
-  }
-
-  printf("Value  = %u\n", flags[0].value.as_uint32);
-  printf("Switch = %s\n\n", flags[1].value.as_bool ? "true" : "false");
-
-  printf("Download url    = %s\n", download_flags[0].value.as_string);
-  printf("Download switch = %s\n", download_flags[1].value.as_bool ? "true" : "false");
-
-  return 0;
 }
 ```
 
-And now goes in-depth yapping.
+Run:
 
-As you see, the main function of this library is `optly_parse_args()`.
-It takes `argc`, `argv` and arrays of `OptlyCommand`s and `OptlyFlag`s.
-I will call arrays of `OptlyCommand`s and `OptlyFlag`s that you pass to `optly_parse_args()` just (your app’s) commands and flags respectively.
-
----
-
-### Flags
-
-`OptlyFlag` structure has (in order): long name (`--value`), short name (`-v`), value and type.
-If you set value of `OptlyFlag` in flags array it will be its default value.
-If you set `NULL` instead, it will mark that this flag is required and optly will issue an error if that flag was not provided at runtime.
-
-Flags arrays are always **NULL-terminated** using `NULL_FLAG`.
-
-#### Supported types
-
-- `OPTLY_TYPE_BOOL` → for switches. Will be `true` if flag is present, or whatever default you give.
-- `OPTLY_TYPE_CHAR` → stores a single character. Takes first character of the provided string.
-- `OPTLY_TYPE_STRING` → takes a string argument as-is.
-- `OPTLY_TYPE_INT8` / `OPTLY_TYPE_INT16` / `OPTLY_TYPE_INT32` / `OPTLY_TYPE_INT64` → signed integer types of different widths.
-- `OPTLY_TYPE_UINT8` / `OPTLY_TYPE_UINT16` / `OPTLY_TYPE_UINT32` / `OPTLY_TYPE_UINT64` → unsigned integer types.
-- `OPTLY_TYPE_FLOAT` → single-precision floating point.
-- `OPTLY_TYPE_DOUBLE` → double-precision floating point.
-
-All flag types (except booleans) accept arguments in the form `--flag=value` or `--flag value`.
-If conversion fails (e.g. passing `--int=hello`), optly prints an error.
-
----
-
-### Commands
-
-`OptlyCommand` structure is even simpler: it has a name (`"download"`, `"help"`, etc.) and its own **NULL-terminated** array of flags (not `NULL_FLAG`-termntaed. Just `NULL`).
-Each entry in your commands array represents a single subcommand your app supports.
-The parser will compare the next arg against this list of names, and if there’s a match, it switches into “command mode” — meaning all following flags are matched against that command’s flag array, not the global one.
-
-Commands arrays are always **NULL-terminated** using `NULL_COMMAND`.
-
-If a command doesn’t take any flags, just pass `{ NULL }` as its flag array.
-
----
-
-### How it behaves
-
-When parser encounters a command, all remaining args are considered to belong to that command.
-So for example:
-
-- `./app --url example.com` → will issue a warning, because top-level flags don’t have `url`.
-- `./app download --url example.com` → works fine, because `download` command has its own `url` flag.
-- `./app --switch download` → sets the top-level `switch` only, because `download` here is just another positional argument.
-- `./app download --switch` → sets the `switch` inside `download_flags`, leaving the top-level one untouched.
-
-In other words, each command comes with its own separate set of flags, and optly will switch context as soon as it sees the command name.
-Subcommands like `./app list help` or positional arguments (`./app input.txt`) are not there yet. Maybe one day, but not today.
-
-### Usage functions
-
-Optly also ships with a couple of helper functions to quickly print usage info:
-
- - `optly_usage(bin_path, commands, flags)` Prints a top-level usage message. Shows available global flags and commands.
- - `optly_command_usage(bin_path, command)` Prints usage message for a single command, including its flags.
-
-They both use the same arrays you already pass into the parser, so you don’t need to maintain a separate “usage string” by hand.
-Good for `--help` flags, or when you want to yell at the user for giving you wrong args.
-
-Example output of `optly_usage()`:
-
-```console
-simple [FLAGS] <COMMAND> [COMMAND FLAGS]
-COMMANDS
-  help
-  download
-FLAGS
-  -v --value
-  -s --switch
-  -s --help
+``` bash
+./app --threads 8 run --port 9000
 ```
 
-Example output of `optly_command_usage()`:
+# Flags
 
-```console
-simple [FLAGS] download [COMMAND FLAGS]
-FLAGS
-  -u --url
-  -s --switch
+Supported forms:
+
+    --verbose
+    -v
+    --threads 4
+    --threads=4
+    -t 4
+
+Short flags can be batched:
+
+    -abc
+
+Equivalent to:
+
+    -a -b -c
+
+*(Batched flags must be boolean.)*
+
+# Commands
+
+Commands are positional tokens:
+
+    app run
+    app build
+    app run check
+
+Each command may define its own:
+
+-   flags
+-   subcommands
+-   positional arguments
+
+# Positional Arguments
+
+Example:
+
+    app build file1 file2
+
+Access them via:
+
+``` c
+OptlyPositional *p = optly_get_positional(cmd, "files");
 ```
 
+# Usage Helpers
 
-## How to run tests
+Print global usage:
 
-```console
-git clone https://github.com/strongleong/optly
-cd optly
-./build.sh && ./out/tessts
+``` c
+optly_usage(argv[0], cmd.commands, cmd.flags);
 ```
 
-## `./build.sh`
+Print command usage:
 
-I use plain bash script `./build.sh` as "build system" with couple flags that may be useful sometimes (all flags that `./build.sh` supports I actually used)
-
-Build flags:
-
-```console
--d --debug     Compile with debug flags
--p --profile   Compile with profile flags
--s --silent    Compile without unnececary output
--o --outdir    Set output dir (default: ./out)
--c --compiler  Set which compier to use (default: clang)
--h --help      Print help
+``` c
+optly_command_usage(argv[0], command);
 ```
 
+# Design Goals
+
+Optly focuses on:
+
+-   **minimal runtime overhead**
+-   **zero allocations**
+-   **simple static configuration**
+
+This makes it suitable for:
+
+-   CLI utilities
+-   embedded tools
+-   static binaries
+-   low-level C projects
+
+# License
+
+Optly is dual licensed:
+
+-   MIT License
+-   Public Domain (Unlicense)
+
+Choose whichever works best for your project.
