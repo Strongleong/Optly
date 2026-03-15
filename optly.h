@@ -78,7 +78,10 @@
                 optly_flag_bool("color", 'c', "Show colors", .value.as_bool = false)
               )
             )
-          )
+          ),
+
+          // Positioanl arguments can be defined lilke this
+          optly_positionals(optly_positional("address", "Address to listen on", .min = 0, .max = 1)),
         ),
       }
     };
@@ -100,6 +103,14 @@
 
       if (cmd.next_command->next_command) {
         printf("Command: %s\n", cmd.next_command->next_command->name);
+      }
+
+      OptlyPositional *address = optly_get_positional(&cmd, "address");
+
+      if (address && address->count == 1) {
+        printf("Address: %s\n", address->values[1]);
+      } else {
+        printf("Address: 0.0.0.0\n");
       }
     }
 
@@ -140,7 +151,26 @@
 
   Access:
 
-    args.positionals.values[i]
+  Named positional: (can have many valies inside)
+
+    Positional *pos = optly_get_positional(&cmd, "name");
+
+  Or directly through command:
+
+    for (OptlyPositional *p = cmd.positionals; p->name; p++) {
+      // ...
+    }
+
+  Help command/flag generation
+  ----------------------------
+
+  You can define
+
+    #define OPTLY_GEN_HELP_FLAG
+    #define OPTLY_GEN_HELP_COMMAND
+
+  to generate help flag `--help | -h` and/or help command `help cmd`.
+  If help command/flag would be found during parsing usage would be automatically called
 
   Licese
   ------
@@ -954,7 +984,12 @@ OPTLYDEF OptlyCommand *optly_parse_args(int argc, char *argv[], OptlyCommand *ma
 #endif
 
       if (!cmd) {
-        optly__push_positional(current_cmd, arg);
+        if (current_cmd->positionals) {
+          optly__push_positional(current_cmd, arg);
+        } else {
+          LOG_VA(ERROR, "Unknown command %s", arg);
+        }
+
         SHIFT_ARG(argv, argc);
         continue;
       }
@@ -972,7 +1007,7 @@ OPTLYDEF OptlyCommand *optly_parse_args(int argc, char *argv[], OptlyCommand *ma
 
       bool infinite_found = false;
 
-      for (OptlyPositional *pos = current_cmd->positionals; pos->name != NULL; pos++) {
+      for (OptlyPositional *pos = current_cmd->positionals; pos != NULL && pos->name != NULL; pos++) {
         if (pos->max == 0) {
           if (infinite_found) {
             LOG_VA(FATAL, "Positional '%s' allows infinite values, but another variadic positional already exists", pos->name);

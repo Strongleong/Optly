@@ -2,6 +2,8 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#define OPTLY_GEN_HELP_FLAG
+#define OPTLY_GEN_HELP_COMMAND
 #define OPTLY_IMPLEMENTATION
 #include <optly.h>
 

@@ -59,15 +59,14 @@ static OptlyCommand cmd = {
         optly_command("check", NULL),
 
         // `./app run dump_config` subcommands
-        optly_command(
-          "dump_config",
+        optly_command("dump_config",
 
-          // We skipped description, so we need to specify fileds now
-          .flags = optly_flags(
-            optly_flag_bool("color", 'c', "Show colors", .value.as_bool = false)
-          )
-        )
-      )
+                      // We skipped description, so we need to specify fileds now
+                      .flags = optly_flags(optly_flag_bool("color", 'c', "Show colors", .value.as_bool = false)))
+      ),
+
+      // Positioanl arguments can be defined lilke this
+      optly_positionals(optly_positional("address", "Address to listen on", .min = 0, .max = 1)),
     ),
   }
 };
@@ -89,5 +88,13 @@ int main(int argc, char **argv) {
 
   if (cmd.next_command->next_command) {
     printf("Command: %s\n", cmd.next_command->next_command->name);
+  }
+
+  OptlyPositional *address = optly_get_positional(&cmd, "address");
+
+  if (address && address->count == 1) {
+    printf("Address: %s\n", address->values[1]);
+  } else {
+    printf("Address: 0.0.0.0\n");
   }
 }
