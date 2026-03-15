@@ -488,6 +488,8 @@ static void optly__usage_commands_list(OptlyCommand *commands) {
   for (OptlyCommand *cmd = commands; !optly_is_command_null(cmd); cmd++) {
     fprintf(stderr, "  %-*s  %s\n", (int)pad, cmd->name, cmd->description ? cmd->description : "");
   }
+
+  fprintf(stderr, "  %-*s  %s\n", (int)pad, "help", "Show help for command");
 }
 
 static void optly__usage_flags(OptlyFlag *flags) {
@@ -513,12 +515,15 @@ static void optly__usage_flags(OptlyFlag *flags) {
 
     if (flag->required) {
       fprintf(stderr, " (required)");
-    } else {
+    } else if (flag->value.as_string != NULL) {
       optly__print_default_value(flag);
     }
 
     fprintf(stderr, "\n");
   }
+
+  char *help = "-h --help";
+  fprintf(stderr, "\n  %-*s Show this message\n", (int) pad, help);
 }
 
 static void optly__usage_positionals(OptlyPositional *pos) {
@@ -541,7 +546,24 @@ OPTLYDEF void optly_usage(OptlyCommand *command) {
   optly__usage_commands_list(command->commands);
   optly__usage_positionals(command->positionals);
   optly__usage_flags(command->flags);
+
+  fprintf(stderr, "\nRun '%s help <command>' for more information.\n", command->name);
 }
+
+static OptlyFlag optly__help_flag = {
+  .fullname    = "help",
+  .shortname   = 'h',
+  .description = "Show this help message",
+  .required    = false,
+  .present     = false,
+  .value       = {.as_bool = false},
+  .type        = OPTLY_TYPE_BOOL
+};
+
+static OptlyCommand optly__help_command = {
+  .name        = "help",
+  .description = "Show help for command"
+};
 
 /**
  * Check if argument matches a flag definition.
@@ -632,6 +654,11 @@ static void optly__parse_flags(char ***argv_ptr, int *argc_ptr, OptlyFlag *flags
       OptlyFlag *flag = optly__find_flag(sarg, flags);
 
       if (!flag) {
+        if (strcmp(arg, "--help") == 0 || strcmp(arg, "-h") == 0) {
+          optly__help_flag.present = true;
+          return;
+        }
+
         LOG_VA(WARN, "Unknown short flag: %s", sarg);
         continue;
       }
@@ -671,6 +698,11 @@ static void optly__parse_flags(char ***argv_ptr, int *argc_ptr, OptlyFlag *flags
   OptlyFlag *flag = optly__find_flag(arg, flags);
 
   if (!flag) {
+    if (strcmp(arg, "--help") == 0 || strcmp(arg, "-h") == 0) {
+      optly__help_flag.present = true;
+      return;
+    }
+
     LOG_VA(WARN, "Unknown flag: %s", arg);
     return;
   }
@@ -892,6 +924,26 @@ OPTLYDEF OptlyCommand *optly_parse_args(int argc, char *argv[], OptlyCommand *ma
     } else {
       OptlyCommand *cmd = optly__parse_command(arg, current_cmd->commands);
 
+      if (strcmp(arg, "help") == 0) {
+        SHIFT_ARG(argv, argc);
+
+        if (argc == 0) {
+          optly_usage(current_cmd);
+          exit(0);
+        }
+
+        char         *target = *argv;
+        OptlyCommand *cmd    = optly__parse_command(target, current_cmd->commands);
+
+        if (!cmd) {
+          LOG_VA(ERROR, "Unknown command: %s", target);
+          exit(1);
+        }
+
+        optly_usage(cmd);
+        exit(0);
+      }
+
       if (!cmd) {
         optly__push_positional(current_cmd, arg);
         SHIFT_ARG(argv, argc);
@@ -911,6 +963,11 @@ OPTLYDEF OptlyCommand *optly_parse_args(int argc, char *argv[], OptlyCommand *ma
 
       current_cmd->next_command = cmd;
       current_cmd               = current_cmd->next_command;
+    }
+
+    if (optly__help_flag.present) {
+      optly_usage(current_cmd);
+      exit(0);
     }
 
     SHIFT_ARG(argv, argc);
