@@ -489,7 +489,9 @@ static void optly__usage_commands_list(OptlyCommand *commands) {
     fprintf(stderr, "  %-*s  %s\n", (int)pad, cmd->name, cmd->description ? cmd->description : "");
   }
 
+#ifdef OPTLY_GEN_HELP_COMMAND
   fprintf(stderr, "  %-*s  %s\n", (int)pad, "help", "Show help for command");
+#endif
 }
 
 static void optly__usage_flags(OptlyFlag *flags) {
@@ -522,8 +524,10 @@ static void optly__usage_flags(OptlyFlag *flags) {
     fprintf(stderr, "\n");
   }
 
+#ifdef OPTLY_GEN_HELP_FLAG
   char *help = "-h --help";
-  fprintf(stderr, "\n  %-*s Show this message\n", (int) pad, help);
+  fprintf(stderr, "\n  %-*s Show this message\n", (int)pad, help);
+#endif
 }
 
 static void optly__usage_positionals(OptlyPositional *pos) {
@@ -547,7 +551,9 @@ OPTLYDEF void optly_usage(OptlyCommand *command) {
   optly__usage_positionals(command->positionals);
   optly__usage_flags(command->flags);
 
+#ifdef OPTLY_GET_HELP_COMMAND
   fprintf(stderr, "\nRun '%s help <command>' for more information.\n", command->name);
+#endif
 }
 
 static OptlyFlag optly__help_flag = {
@@ -654,10 +660,12 @@ static void optly__parse_flags(char ***argv_ptr, int *argc_ptr, OptlyFlag *flags
       OptlyFlag *flag = optly__find_flag(sarg, flags);
 
       if (!flag) {
+#ifdef OPTLY_GEN_HELP_FLAG
         if (strcmp(arg, "--help") == 0 || strcmp(arg, "-h") == 0) {
           optly__help_flag.present = true;
           return;
         }
+#endif
 
         LOG_VA(WARN, "Unknown short flag: %s", sarg);
         continue;
@@ -698,10 +706,12 @@ static void optly__parse_flags(char ***argv_ptr, int *argc_ptr, OptlyFlag *flags
   OptlyFlag *flag = optly__find_flag(arg, flags);
 
   if (!flag) {
+#ifdef OPTLY_GEN_HELP_FLAG
     if (strcmp(arg, "--help") == 0 || strcmp(arg, "-h") == 0) {
       optly__help_flag.present = true;
       return;
     }
+#endif
 
     LOG_VA(WARN, "Unknown flag: %s", arg);
     return;
@@ -882,9 +892,6 @@ inline OPTLYDEF OptlyPositional *optly_get_positional(OptlyCommand *command, con
   return NULL;
 }
 
-/**
- * Parse OPTLY arguments.
- */
 OPTLYDEF OptlyCommand *optly_parse_args(int argc, char *argv[], OptlyCommand *main_cmd) {
   assert(argc > 0);
 
@@ -924,6 +931,7 @@ OPTLYDEF OptlyCommand *optly_parse_args(int argc, char *argv[], OptlyCommand *ma
     } else {
       OptlyCommand *cmd = optly__parse_command(arg, current_cmd->commands);
 
+#ifdef OPTLY_GEN_HELP_COMMAND
       if (strcmp(arg, "help") == 0) {
         SHIFT_ARG(argv, argc);
 
@@ -943,6 +951,7 @@ OPTLYDEF OptlyCommand *optly_parse_args(int argc, char *argv[], OptlyCommand *ma
         optly_usage(cmd);
         exit(0);
       }
+#endif
 
       if (!cmd) {
         optly__push_positional(current_cmd, arg);
@@ -959,6 +968,19 @@ OPTLYDEF OptlyCommand *optly_parse_args(int argc, char *argv[], OptlyCommand *ma
 
       if (!optly__validate_positionals(current_cmd)) {
         all_required_flags_present = false;
+      }
+
+      bool infinite_found = false;
+
+      for (OptlyPositional *pos = current_cmd->positionals; pos->name != NULL; pos++) {
+        if (pos->max == 0) {
+          if (infinite_found) {
+            LOG_VA(FATAL, "Positional '%s' allows infinite values, but another variadic positional already exists", pos->name);
+            exit(1);
+          }
+
+          infinite_found = true;
+        }
       }
 
       current_cmd->next_command = cmd;
