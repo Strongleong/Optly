@@ -128,7 +128,7 @@ void deploy(OptlyCommand *cmd) {
   } else if (optly_is_command(cmd->next_command, "status")) {
     status(cmd->next_command);
   } else {
-    optly_usage(cmd->name, cmd->commands, cmd->flags);
+    optly_usage(cmd);
   }
 }
 
@@ -185,7 +185,7 @@ void services(OptlyCommand *cmd) {
   } else if (optly_is_command(cmd->next_command, "restart")) {
     restart(cmd->next_command);
   } else {
-    optly_usage(cmd->name, cmd->commands, cmd->flags);
+    optly_usage(cmd);
   }
 }
 
@@ -210,7 +210,7 @@ int main(int argc, char *argv[]) {
   } else if (optly_is_command(cmd.next_command, "stop")) {
     printf("this will never reach it here, 'stop' command is subcommand of 'service' command\n");
   } else {
-    optly_usage(cmd.name, cmd.commands, cmd.flags);
+    optly_usage(&cmd);
   }
 
   return 0;

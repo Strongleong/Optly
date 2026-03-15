@@ -295,9 +295,6 @@ struct OptlyCommand {
 
 OPTLYDEF OptlyCommand *optly_parse_args(int argc, char *argv[], OptlyCommand *main_cmd);
 
-OPTLYDEF void optly_usage(char const *const bin_path, OptlyCommand *commands, OptlyFlag *flags);
-OPTLYDEF void optly_command_usage(char const *const bin_path, OptlyCommand *command);
-
 OPTLYDEF OptlyFlag *optly_get_flag(OptlyFlag *flags, const char *name);
 
 OPTLYDEF bool     optly_bool(OptlyCommand *command, const char *name);
@@ -317,6 +314,8 @@ OPTLYDEF double   optly_double(OptlyCommand *command, const char *name);
 OPTLYDEF bool optly_is_command(OptlyCommand *command, const char *name);
 
 OPTLYDEF OptlyPositional *optly_get_positional(OptlyCommand *command, const char *name);
+
+OPTLYDEF void optly_usage(OptlyCommand *command);
 
 inline bool optly_is_flag_null(const OptlyFlag *flag) {
   return flag == NULL || (flag->fullname == NULL && flag->shortname == 0);
@@ -357,6 +356,69 @@ static const char *logcie_module = "OPTLY";
     abort();                                                          \
   } while (0)
 
+static bool optly__has_flags(OptlyCommand *cmd) {
+  return cmd && cmd->flags && !optly_is_flag_null(cmd->flags);
+}
+
+static bool optly__has_commands(OptlyCommand *cmd) {
+  return cmd && cmd->commands && !optly_is_command_null(cmd->commands);
+}
+
+static bool optly__has_positionals(OptlyCommand *cmd) {
+  return cmd && cmd->positionals && cmd->positionals->name;
+}
+
+static void optly__usage_positionals_signature(OptlyPositional *pos) {
+  if (!pos) return;
+
+  for (; pos->name; pos++) {
+    bool required = pos->min > 0;
+    bool variadic = pos->max == 0 || pos->max > 1;
+
+    if (required)
+      fprintf(stderr, " <%s%s>", pos->name, variadic ? "..." : "");
+    else
+      fprintf(stderr, " [%s%s]", pos->name, variadic ? "..." : "");
+  }
+}
+
+static void optly__usage_signature(OptlyCommand *cmd) {
+  fprintf(stderr, "Usage: %s", cmd->name);
+
+  if (optly__has_flags(cmd))
+    fprintf(stderr, " [FLAGS]");
+
+  if (optly__has_positionals(cmd))
+    optly__usage_positionals_signature(cmd->positionals);
+
+  if (optly__has_commands(cmd))
+    fprintf(stderr, " <COMMAND>");
+
+  fprintf(stderr, "\n");
+}
+
+static uint8_t type_name_pad = 8;
+
+static const char *optly__flag_type_name(OptlyFlagType type) {
+  switch (type) {
+    case OPTLY_TYPE_BOOL:   return "";
+    case OPTLY_TYPE_CHAR:   return "<char>";
+    case OPTLY_TYPE_STRING: return "<str>";
+    case OPTLY_TYPE_INT8:   return "<i8>";
+    case OPTLY_TYPE_INT16:  return "<i16>";
+    case OPTLY_TYPE_INT32:  return "<i32>";
+    case OPTLY_TYPE_INT64:  return "<i64>";
+    case OPTLY_TYPE_UINT8:  return "<u8>";
+    case OPTLY_TYPE_UINT16: return "<u16>";
+    case OPTLY_TYPE_UINT32: return "<u32>";
+    case OPTLY_TYPE_UINT64: return "<u64>";
+    case OPTLY_TYPE_FLOAT:  return "<float>";
+    case OPTLY_TYPE_DOUBLE: return "<double>";
+  }
+
+  return "";
+}
+
 static size_t optly__flag_print_width(OptlyFlag *flags) {
   size_t max = 0;
 
@@ -379,6 +441,30 @@ static size_t optly__flag_print_width(OptlyFlag *flags) {
   return max;
 }
 
+static void optly__print_default_value(OptlyFlag *flag) {
+  if (flag->type == OPTLY_TYPE_BOOL) return;
+
+  fprintf(stderr, " (default: ");
+
+  switch (flag->type) {
+    case OPTLY_TYPE_CHAR:   fprintf(stderr, "%c", flag->value.as_char); break;
+    case OPTLY_TYPE_STRING: fprintf(stderr, "%s", flag->value.as_string); break;
+    case OPTLY_TYPE_INT8:   fprintf(stderr, "%d", flag->value.as_int8); break;
+    case OPTLY_TYPE_INT16:  fprintf(stderr, "%d", flag->value.as_int16); break;
+    case OPTLY_TYPE_INT32:  fprintf(stderr, "%d", flag->value.as_int32); break;
+    case OPTLY_TYPE_INT64:  fprintf(stderr, "%lld", (long long)flag->value.as_int64); break;
+    case OPTLY_TYPE_UINT8:  fprintf(stderr, "%u", flag->value.as_uint8); break;
+    case OPTLY_TYPE_UINT16: fprintf(stderr, "%u", flag->value.as_uint16); break;
+    case OPTLY_TYPE_UINT32: fprintf(stderr, "%u", flag->value.as_uint32); break;
+    case OPTLY_TYPE_UINT64: fprintf(stderr, "%llu", (unsigned long long)flag->value.as_uint64); break;
+    case OPTLY_TYPE_FLOAT:  fprintf(stderr, "%f", flag->value.as_float); break;
+    case OPTLY_TYPE_DOUBLE: fprintf(stderr, "%f", flag->value.as_double); break;
+    default:                break;
+  }
+
+  fprintf(stderr, ")");
+}
+
 static size_t optly__command_print_width(OptlyCommand *commands) {
   size_t max = 0;
 
@@ -393,61 +479,68 @@ static size_t optly__command_print_width(OptlyCommand *commands) {
   return max;
 }
 
-/**
- * Print list of available commands.
- */
 static void optly__usage_commands_list(OptlyCommand *commands) {
-  fprintf(stderr, "COMMANDS\n");
+  if (!commands) return;
+
+  fprintf(stderr, "\nCOMMANDS\n");
   size_t pad = optly__command_print_width(commands);
 
   for (OptlyCommand *cmd = commands; !optly_is_command_null(cmd); cmd++) {
-    fprintf(stderr, "  %-*s  %s\n", (int)pad, cmd->name, cmd->description);
+    fprintf(stderr, "  %-*s  %s\n", (int)pad, cmd->name, cmd->description ? cmd->description : "");
   }
 }
 
-/**
- * Print list of flags.
- */
 static void optly__usage_flags(OptlyFlag *flags) {
-  if (!flags) {
-    return;
-  }
+  if (!flags) return;
 
-  fprintf(stderr, "FLAGS\n");
+  fprintf(stderr, "\nFLAGS\n");
+
   size_t pad = optly__flag_print_width(flags);
 
   for (OptlyFlag *flag = flags; !optly_is_flag_null(flag); flag++) {
-    size_t buflen = 128;
-    char   buf[buflen];
-
-    snprintf(buf, buflen, "  ");
+    char        buf[256];
+    const char *type = optly__flag_type_name(flag->type);
 
     if (flag->shortname && flag->fullname) {
-      snprintf(buf, buflen, "-%c --%s", flag->shortname, flag->fullname);
+      snprintf(buf, sizeof(buf), "-%c --%s %s", flag->shortname, flag->fullname, type);
     } else if (flag->fullname) {
-      snprintf(buf, buflen, "--%s", flag->fullname);
+      snprintf(buf, sizeof(buf), "--%s %s", flag->fullname, type);
     } else {
-      snprintf(buf, buflen, "-%c", flag->shortname);
+      snprintf(buf, sizeof(buf), "-%c %s", flag->shortname, type);
     }
 
-    // NOTE: @print_flag_type
-    fprintf(stderr, "  %-*s  %s\n", (int)pad, buf, flag->description);
+    fprintf(stderr, "  %-*s  %s", (int)pad + type_name_pad, buf, flag->description ? flag->description : "");
+
+    if (flag->required) {
+      fprintf(stderr, " (required)");
+    } else {
+      optly__print_default_value(flag);
+    }
+
+    fprintf(stderr, "\n");
   }
 }
 
-OPTLYDEF void optly_command_usage(char const *const bin_path, OptlyCommand *command) {
-  const char *name = strrchr(bin_path, '/');
-  name             = name ? name + 1 : bin_path;
-  fprintf(stderr, "%s [FLAGS] %s [COMMAND FLAGS]\n", name, command->name);
-  optly__usage_flags(command->flags);
+static void optly__usage_positionals(OptlyPositional *pos) {
+  if (!pos) return;
+
+  fprintf(stderr, "\nPOSITIONAL ARGUMENTS\n");
+
+  for (; pos->name; pos++) {
+    fprintf(stderr, "  %s  (%zu..%zu values)\n", pos->name, pos->min, pos->max ? pos->max : SIZE_MAX);
+  }
 }
 
-OPTLYDEF void optly_usage(char const *const bin_path, OptlyCommand *commands, OptlyFlag *flags) {
-  const char *name = strrchr(bin_path, '/');
-  name             = name ? name + 1 : bin_path;
-  fprintf(stderr, "%s [FLAGS] <COMMAND> [COMMAND FLAGS]\n", name);
-  optly__usage_commands_list(commands);
-  optly__usage_flags(flags);
+OPTLYDEF void optly_usage(OptlyCommand *command) {
+  if (command->description) {
+    fprintf(stderr, "%s\n\n", command->description);
+  }
+
+  optly__usage_signature(command);
+
+  optly__usage_commands_list(command->commands);
+  optly__usage_positionals(command->positionals);
+  optly__usage_flags(command->flags);
 }
 
 /**
@@ -851,6 +944,7 @@ OPTLYDEF OptlyCommand *optly_parse_args(int argc, char *argv[], OptlyCommand *ma
 // TODO: Support different kind of numbers (0xBABA, 0123)?
 // TODO: Return state? errors? from optly_parse_args
 // TODO: Come up with a way to automatically choose field for .value in optly_flag
+// TODO: Enum type flag support
 
 /*
    ------------------------------------------------------------------------------
