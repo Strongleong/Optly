@@ -428,7 +428,6 @@ inline OPTLYDEF OptlyPositional *optly_get_positional(OptlyCommand *command, con
 #define OPTLY_LOG_FATAL(...) OPTLY_LOG_BACKED(FATAL, __VA_ARGS__)
 #endif
 
-
 #define SHIFT_ARG(argv, argc) (++(argv), --(argc))
 
 #define UNREACHABLE(message)                                               \

@@ -85,7 +85,7 @@ Run:
 
 This library reports its errors by itself, no complicated error handling required.
 
-By default reporting is disabled, but Optly provides [logcie](https://github.com/strongleong/logcie) interface.
+By default reporting is disabled, but Optly provides [logcie](https://github.com/Strongleong/logcie/tree/custom-format?tab=readme-ov-file#usage-in-libraries) interface.
 
 Just put logcie somewhre next to optly in your project, or define logging macros
 
