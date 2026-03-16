@@ -21,7 +21,7 @@ making it ideal for small CLI tools and embedded-style programs.
 -   Positional arguments
 -   Optional and required flags
 
-# Installation
+## Installation
 
 Just drop `optly.h` into your project.
 
@@ -38,7 +38,7 @@ In other files:
 #include "optly.h"
 ```
 
-# Example
+## Example
 
 ``` c
 #define OPTLY_IMPLEMENTATION
@@ -81,7 +81,27 @@ Run:
 ./app --threads 8 run --port 9000
 ```
 
-# Flags
+## Error handling
+
+This library reports its errors by itself, no complicated error handling required.
+
+By default reporting is disabled, but Optly provides [logcie](https://github.com/strongleong/logcie) interface.
+
+Just put logcie somewhre next to optly in your project, or define logging macros
+
+```c
+#define OPTLY_LOG_BACKEND(level, ...) fprintf(stderr, ##level ": " __VA_ARGS__);
+```
+
+You can disable or enable certan logging levels in compiile time:
+
+```c
+#define OPTLY_LOG_DEBUG // define to nothing
+```
+
+To control logging in runtime check out [logcie](https://github.com/strongleong/logcie).
+
+## Flags
 
 Supported forms:
 
@@ -101,7 +121,7 @@ Equivalent to:
 
 *(Batched flags must be boolean.)*
 
-# Commands
+## Commands
 
 Commands are positional tokens:
 
@@ -127,7 +147,7 @@ Access them via:
 OptlyPositional *p = optly_get_positional(cmd, "files");
 ```
 
-# Usage Helpers
+## Usage Helpers
 
 Print global usage:
 
@@ -141,7 +161,7 @@ Print command usage:
 optly_command_usage(argv[0], command);
 ```
 
-# Design Goals
+## Design Goals
 
 Optly focuses on:
 
@@ -156,7 +176,7 @@ This makes it suitable for:
 -   static binaries
 -   low-level C projects
 
-# License
+## License
 
 Optly is dual licensed:
 
