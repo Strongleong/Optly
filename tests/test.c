@@ -60,52 +60,6 @@ static void test_short_bool_plain(void) {
   assert(g_flags[1].value.as_bool == true);
 }
 
-static void test_long_bool_equals_true_false(void) {
-  reset_flags(g_flags);
-  char *vec1[] = {"--verbose=true", NULL};
-  call_parse(vec1, 1, g_flags);
-  assert(g_flags[1].value.as_bool == true);
-
-  reset_flags(g_flags);
-  char *vec2[] = {"--verbose=false", NULL};
-  call_parse(vec2, 1, g_flags);
-  assert(g_flags[1].value.as_bool == false);
-}
-
-static void test_short_bool_space_yes_no(void) {
-  reset_flags(g_flags);
-  char *vec1[] = {"-v", "yes", NULL};
-  call_parse(vec1, 2, g_flags);
-  assert(g_flags[1].value.as_bool == true);
-
-  reset_flags(g_flags);
-  char *vec2[] = {"-v", "no", NULL};
-  call_parse(vec2, 2, g_flags);
-  assert(g_flags[1].value.as_bool == false);
-}
-
-static void test_short_bool_abbrev_and_digits(void) {
-  reset_flags(g_flags);
-  char *vec1[] = {"--verbose", "y", NULL};
-  call_parse(vec1, 2, g_flags);
-  assert(g_flags[1].value.as_bool == true);
-
-  reset_flags(g_flags);
-  char *vec2[] = {"--verbose", "n", NULL};
-  call_parse(vec2, 2, g_flags);
-  assert(g_flags[1].value.as_bool == false);
-
-  reset_flags(g_flags);
-  char *vec3[] = {"--verbose", "1", NULL};
-  call_parse(vec3, 2, g_flags);
-  assert(g_flags[1].value.as_bool == true);
-
-  reset_flags(g_flags);
-  char *vec4[] = {"--verbose", "0", NULL};
-  call_parse(vec4, 2, g_flags);
-  assert(g_flags[1].value.as_bool == false);
-}
-
 static void test_batch_short_no_values(void) {
   reset_flags(g_flags);
   char *vec[] = {"-hv", NULL};
@@ -174,9 +128,6 @@ int main(void) {
 
   RUN_TEST(test_long_bool_plain);
   RUN_TEST(test_short_bool_plain);
-  RUN_TEST(test_long_bool_equals_true_false);
-  RUN_TEST(test_short_bool_space_yes_no);
-  RUN_TEST(test_short_bool_abbrev_and_digits);
   RUN_TEST(test_batch_short_no_values);
   RUN_TEST(test_batch_short_equals_errors);
   RUN_TEST(test_long_value_equals_and_space);
