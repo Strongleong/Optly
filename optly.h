@@ -181,11 +181,11 @@
 
   `optly_parse_args()` returns an `OptlyErrors` struct:
 
-  OptlyErrors errs = optly_parse_args(argc, argv, &cmd);
+    OptlyErrors errs = optly_parse_args(argc, argv, &cmd);
 
     for (size_t i = 0; i < optly_errors_count(&errs); i++) {
       OptlyError e = optly_errors_at(&errs, i);
-      printf("Error: %s", optly_error_message(e.code));
+      printf("Error: %s", optly_error_message(e.kind));
 
       if (e.arg) {
         printf(" (%s)", e.arg);
@@ -337,7 +337,7 @@ typedef enum OptlyErrorKind {
 
 typedef struct OptlyError {
   OptlyErrorKind kind;
-  const char *arg;
+  const char    *arg;
 } OptlyError;
 
 typedef struct OptlyErrors {
@@ -457,7 +457,7 @@ inline OPTLYDEF OptlyPositional *optly_get_positional(OptlyCommand *command, con
 
 // Logcie integration
 
-#ifndef OPTLY_LOG_BACKEND
+#ifndef OPTLY_LOG
 #ifdef LOGCIE
 #ifdef LOGCIE_VA_LOGS
 #define OPTLY_LOG(level, ...) LOGCIE_##level##_VA(__VA_ARGS__)
@@ -511,13 +511,12 @@ static void optly__push_error(OptlyErrors *errs, OptlyErrorKind err, const char 
   }
 
   if (errs->count < OPTLY_MAX_ERRORS) {
-    errs->items[errs->count++] = (OptlyError){ err, arg };
+    errs->items[errs->count++] = (OptlyError){err, arg};
   }
 }
 
 #ifdef OPTLY_NO_EXIT
-#define OPTLY_EXIT(errs, code) \
-  do { optly__push_error((errs), (code)); } while (0)
+#define OPTLY_EXIT(errs, code)
 #else
 #define OPTLY_EXIT(errs, code) \
   do { exit(code); } while (0)
@@ -806,10 +805,45 @@ static void optly__flag_set_value(OptlyFlag *flag, char *value, OptlyErrors *err
   flag->present = true;
 }
 
-/**
- * Parse flags from argv.
- */
-static void optly__parse_flags(char ***argv_ptr, int *argc_ptr, OptlyFlag *flags, OptlyErrors *errs) {
+static void optly__parse_batch_flags(char *arg, OptlyFlag *flags, OptlyErrors *errs) {
+  if (strchr(arg, '=') != NULL) {
+    return;
+  }
+
+  for (char *c = &arg[1]; *c; c++) {
+    char sarg[3];
+    snprintf(sarg, sizeof(sarg), "-%c", *c);
+
+    OptlyFlag *flag = optly__find_flag(sarg, flags);
+
+    if (!flag) {
+#ifdef OPTLY_GEN_HELP_FLAG
+      if (strcmp(sarg, "-h") == 0) {
+        optly__help_flag.present = true;
+        continue;
+      }
+#endif
+
+      OPTLY_LOG(WARN, "Unknown short flag: %s", sarg);
+      optly__push_error(errs, OPTLY_ERR_UNKNOWN_FLAG, &flag->shortname);
+
+      continue;
+    }
+
+    if (flag->type != OPTLY_TYPE_BOOL) {
+      OPTLY_LOG(WARN, "cannot batch non-boolean flags (invalid flag in %s)", sarg);
+      optly__push_error(errs, OPTLY_ERR_BATCH_NON_BOOL, &flag->shortname);
+      continue;
+    }
+
+    flag->value.as_bool = true;
+    flag->present       = true;
+  }
+
+  return;
+}
+
+static void optly__parse_long_flags(char ***argv_ptr, int *argc_ptr, OptlyFlag *flags, OptlyErrors *errs) {
   char **argv = *argv_ptr;
   int    argc = *argc_ptr;
 
@@ -818,46 +852,6 @@ static void optly__parse_flags(char ***argv_ptr, int *argc_ptr, OptlyFlag *flags
   }
 
   char *arg = *argv;
-
-  bool is_batch_short = (arg[0] == '-' && arg[1] != '-' && strlen(arg) > 2) && arg[2] != '=';
-
-  if (is_batch_short) {
-    if (strchr(arg, '=') != NULL) {
-      return;
-    }
-
-    for (char *c = &arg[1]; *c; c++) {
-      char sarg[3];
-      snprintf(sarg, sizeof(sarg), "-%c", *c);
-
-      OptlyFlag *flag = optly__find_flag(sarg, flags);
-
-      if (!flag) {
-#ifdef OPTLY_GEN_HELP_FLAG
-        if (strcmp(sarg, "-h") == 0) {
-          optly__help_flag.present = true;
-          continue;
-        }
-#endif
-
-        OPTLY_LOG(WARN, "Unknown short flag: %s", sarg);
-        optly__push_error(errs, OPTLY_ERR_UNKNOWN_FLAG, sarg);
-
-        continue;
-      }
-
-      if (flag->type != OPTLY_TYPE_BOOL) {
-        OPTLY_LOG(WARN, "cannot batch non-boolean flags (invalid flag in %s)", sarg);
-        optly__push_error(errs, OPTLY_ERR_BATCH_NON_BOOL, sarg);
-        continue;
-      }
-
-      flag->value.as_bool = true;
-      flag->present       = true;
-    }
-
-    return;
-  }
 
   char *value = NULL;
   char *eq    = strchr(arg, '=');
@@ -906,6 +900,28 @@ static void optly__parse_flags(char ***argv_ptr, int *argc_ptr, OptlyFlag *flags
 
   *argv_ptr = argv;
   *argc_ptr = argc;
+}
+
+/**
+ * Parse flags from argv.
+ */
+static void optly__parse_flags(char ***argv_ptr, int *argc_ptr, OptlyFlag *flags, OptlyErrors *errs) {
+  char **argv = *argv_ptr;
+  int    argc = *argc_ptr;
+
+  if (!argv || argc <= 0 || !*argv) {
+    return;
+  }
+
+  char *arg = *argv;
+
+  bool is_batch_short = (arg[0] == '-' && arg[1] != '-' && strlen(arg) > 2) && arg[2] != '=';
+
+  if (is_batch_short) {
+    optly__parse_batch_flags(arg, flags, errs);
+  } else {
+    optly__parse_long_flags(argv_ptr, argc_ptr, flags, errs);
+  }
 }
 
 /**
@@ -958,7 +974,7 @@ static void optly__push_positional(OptlyCommand *cmd, char *value) {
 
 static void optly__validate_positionals(OptlyCommand *cmd, OptlyErrors *errs) {
   if (!cmd->positionals) {
-    return ;
+    return;
   }
 
   for (OptlyPositional *pos = cmd->positionals; pos->name; pos++) {
@@ -1116,7 +1132,7 @@ OPTLYDEF OptlyErrors optly_parse_args(int argc, char *argv[], OptlyCommand *main
 
         if (!cmd) {
           OPTLY_LOG(ERROR, "Unknown command: %s", target);
-          optly__push_error(&errs, OPTLY_ERR_UNKNOWN_COMMAND);
+          optly__push_error(&errs, OPTLY_ERR_UNKNOWN_COMMAND, target);
           OPTLY_EXIT(&errs, OPTLY_ERR_UNKNOWN_COMMAND);
         }
 

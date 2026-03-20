@@ -1,141 +1,387 @@
-#define OPTLY_IMPLEMENTATION
-#include <assert.h>
-#include <optly.h>
+#include <math.h>
+#include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
-/* ---------- helpers ---------- */
+#define OPTLY_NO_EXIT
+#define OPTLY_IMPLEMENTATION
+#define OPTLY_LOG(...)
+#include "optly.h"
 
-#define RUN_TEST(fn)                                                 \
-  do {                                                               \
-    /* Tests are fast, so if test would pass it would override */    \
-    /* word FAIL instantly, but if test would fail then FAIL stay */ \
-    printf("\033[31m[ FAIL ]\033[0m %s\n", #fn);                     \
-    fn();                                                            \
-    printf("\033[F\033[32m[ PASS ]\033[0m %s\n", #fn);               \
+/* -------------------------- tiny test framework -------------------------- */
+#define ANSI_RED(x)   "\033[31m" x "\033[0m"
+#define ANSI_GREEN(x) "\033[32m" x "\033[0m"
+
+static int g_asserts = 0;
+static int g_failed  = 0;
+
+#define ASSERT_TRUE(expr)                                                                                 \
+  do {                                                                                                    \
+    g_asserts++;                                                                                          \
+    if (!(expr)) {                                                                                        \
+      fprintf(stderr, "    " ANSI_RED("ASSERT_TRUE failed") ": %s (%s:%d)\n", #expr, __FILE__, __LINE__); \
+      g_failed++;                                                                                         \
+      return;                                                                                             \
+    }                                                                                                     \
   } while (0)
 
-static void reset_flags(OptlyFlag *f) {
-  for (int i = 0; !optly_is_flag_null(&f[i]); ++i) {
-    switch (f[i].type) {
-      case OPTLY_TYPE_BOOL:   f[i].value.as_bool = false; break;
-      case OPTLY_TYPE_STRING: f[i].value.as_string = NULL; break;
-      case OPTLY_TYPE_INT64:  f[i].value.as_int64 = 0; break;
-      case OPTLY_TYPE_UINT64: f[i].value.as_uint64 = 0; break;
-      default:                memset(&f[i].value, 0, sizeof(f[i].value)); break;
-    }
-  }
+#define ASSERT_FALSE(expr)                                                                                 \
+  do {                                                                                                     \
+    g_asserts++;                                                                                           \
+    if ((expr)) {                                                                                          \
+      fprintf(stderr, "    " ANSI_RED("ASSERT_FALSE failed") ": %s (%s:%d)\n", #expr, __FILE__, __LINE__); \
+      g_failed++;                                                                                          \
+      return;                                                                                              \
+    }                                                                                                      \
+  } while (0)
+
+#define ASSERT_EQ_INT(actual, expected)                                                                                            \
+  do {                                                                                                                             \
+    g_asserts++;                                                                                                                   \
+    long long a__ = (long long)(actual);                                                                                           \
+    long long e__ = (long long)(expected);                                                                                         \
+    if (a__ != e__) {                                                                                                              \
+      fprintf(stderr, "    " ANSI_RED("ASSERT_EQ_INT failed") ": got=%lld expected=%lld (%s:%d)\n", a__, e__, __FILE__, __LINE__); \
+      g_failed++;                                                                                                                  \
+      return;                                                                                                                      \
+    }                                                                                                                              \
+  } while (0)
+
+#define ASSERT_EQ_STR(actual, expected)                                                                                                                      \
+  do {                                                                                                                                                       \
+    g_asserts++;                                                                                                                                             \
+    const char *a__ = (actual);                                                                                                                              \
+    const char *e__ = (expected);                                                                                                                            \
+    if ((a__ == NULL && e__ != NULL) || (a__ != NULL && e__ == NULL) || (a__ && e__ && strcmp(a__, e__) != 0)) {                                             \
+      fprintf(stderr, "    " ANSI_RED("ASSERT_EQ_STR failed") ": got=%s expected=%s (%s:%d)\n", a__ ? a__ : "NULL", e__ ? e__ : "NULL", __FILE__, __LINE__); \
+      g_failed++;                                                                                                                                            \
+      return;                                                                                                                                                \
+    }                                                                                                                                                        \
+  } while (0)
+
+#define ASSERT_FLOAT_NEAR(actual, expected, eps)                                                                                                         \
+  do {                                                                                                                                                   \
+    g_asserts++;                                                                                                                                         \
+    double a__ = (double)(actual);                                                                                                                       \
+    double e__ = (double)(expected);                                                                                                                     \
+    if (fabs(a__ - e__) > (eps)) {                                                                                                                       \
+      fprintf(stderr, "    " ANSI_RED("ASSERT_FLOAT_NEAR failed") ": got=%f expected=%f eps=%f (%s:%d)\n", a__, e__, (double)(eps), __FILE__, __LINE__); \
+      g_failed++;                                                                                                                                        \
+      return;                                                                                                                                            \
+    }                                                                                                                                                    \
+  } while (0)
+
+#define RUN_TEST(fn)                                      \
+  do {                                                    \
+    int before = g_failed;                                \
+    fn();                                                 \
+    if (g_failed == before)                               \
+      fprintf(stderr, ANSI_GREEN("[PASS]") " %s\n", #fn); \
+    else                                                  \
+      fprintf(stderr, ANSI_RED("[FAIL]") " %s\n", #fn);   \
+  } while (0)
+
+/* ------------------------------ helpers ---------------------------------- */
+
+static void assert_err_count(const OptlyErrors *errs, size_t expected) {
+  ASSERT_EQ_INT((long long)optly_errors_count(errs), (long long)expected);
 }
 
-/* call optly__parse_flags the same way the parser does:
-   pass a cursor (char**) by address, and a mutable argc */
-static void call_parse(char **vec, int len, OptlyFlag *flags) {
-  char **cursor = vec; /* <- real char** */
-  int    argc   = len;
-  optly__parse_flags(&cursor, &argc, flags);
+static void assert_err_at(const OptlyErrors *errs, size_t idx, OptlyErrorKind kind, const char *arg) {
+  OptlyError e = optly_errors_at(errs, idx);
+  ASSERT_EQ_INT((int)e.kind, (int)kind);
+  if (arg) ASSERT_EQ_STR(e.arg, arg);
 }
 
-/* ---------- flag set used in tests ---------- */
+/* ------------------------------ test cases -------------------------------- */
 
-static OptlyFlag *g_flags = optly_flags(
-  optly_flag_bool("help",    'h'),
-  optly_flag_bool("verbose", 'v'),
-  optly_flag_int64("value",  'x'),
-  optly_flag_string("name",  'n')
-);
+static void test_optional_flags_defaults(void) {
+  OptlyCommand cmd = optly_command(
+    "app",
+    .flags = optly_flags(
+      optly_flag_bool("verbose", .shortname = 'v', .value.as_bool = false),
+      optly_flag_uint32("threads", .shortname = 't', .value.as_uint32 = 4)
+    )
+  );
 
-/* ---------- tests ---------- */
-
-static void test_long_bool_plain(void) {
-  reset_flags(g_flags);
-  char *vec[] = {"--help", NULL};
-  call_parse(vec, 1, g_flags);
-  assert(g_flags[0].value.as_bool == true);
+  char       *argv[] = {"app", NULL};
+  OptlyErrors errs   = optly_parse_args(1, argv, &cmd);
+  assert_err_count(&errs, 0);
+  ASSERT_FALSE(optly_flag_value_bool(&cmd, "verbose"));
+  ASSERT_EQ_INT(optly_flag_value_uint32(&cmd, "threads"), 4);
 }
 
-static void test_short_bool_plain(void) {
-  reset_flags(g_flags);
-  char *vec[] = {"-v", NULL};
-  call_parse(vec, 1, g_flags);
-  assert(g_flags[1].value.as_bool == true);
+static void test_long_short_and_batch_bools(void) {
+  OptlyCommand cmd = optly_command(
+    "app",
+    .flags = optly_flags(
+      optly_flag_bool("a", .shortname = 'a'),
+      optly_flag_bool("b", .shortname = 'b'),
+      optly_flag_bool("c", .shortname = 'c')
+    )
+  );
+
+  char       *argv[] = {"app", "-abc", NULL};
+  OptlyErrors errs   = optly_parse_args(2, argv, &cmd);
+  assert_err_count(&errs, 0);
+  ASSERT_TRUE(optly_flag_value_bool(&cmd, "a"));
+  ASSERT_TRUE(optly_flag_value_bool(&cmd, "b"));
+  ASSERT_TRUE(optly_flag_value_bool(&cmd, "c"));
 }
 
-static void test_batch_short_no_values(void) {
-  reset_flags(g_flags);
-  char *vec[] = {"-hv", NULL};
-  call_parse(vec, 1, g_flags);
-  assert(g_flags[0].value.as_bool == true);
-  assert(g_flags[1].value.as_bool == true);
-}
+static void test_inline_and_separate_values(void) {
+  OptlyCommand cmd = optly_command(
+    "app",
+    .flags = optly_flags(
+      optly_flag_uint32("threads", .shortname = 't'),
+      optly_flag_string("name", .shortname = 'n')
+    )
+  );
 
-static void test_batch_short_equals_errors(void) {
-  reset_flags(g_flags);
-  /* The parser should treat "-hv=1" as an error and not set either flag */
-  char *vec[] = {"-hv=1", NULL};
-  call_parse(vec, 1, g_flags);
-  assert(g_flags[0].value.as_bool == false);
-  assert(g_flags[1].value.as_bool == false);
-}
-
-static void test_long_value_equals_and_space(void) {
-  reset_flags(g_flags);
-  char *vec1[] = {"--value=15", NULL};
-  call_parse(vec1, 1, g_flags);
-  assert(g_flags[2].value.as_int64 == 15);
-
-  reset_flags(g_flags);
-  char *vec2[] = {"--value", "42", NULL};
-  call_parse(vec2, 2, g_flags);
-  assert(g_flags[2].value.as_int64 == 42);
+  char       *argv[] = {"app", "--threads=8", "--name", "Alice", NULL};
+  OptlyErrors errs   = optly_parse_args(4, argv, &cmd);
+  assert_err_count(&errs, 0);
+  ASSERT_EQ_INT(optly_flag_value_uint32(&cmd, "threads"), 8);
+  ASSERT_EQ_STR(optly_flag_value_string(&cmd, "name"), "Alice");
 }
 
 static void test_short_value_equals_and_space(void) {
-  /* -x is short for "value" in this set */
-  reset_flags(g_flags);
-  char *vec1[] = {"-x=77", NULL};
-  call_parse(vec1, 1, g_flags);
-  assert(g_flags[2].value.as_int64 == 77);
+  OptlyCommand cmd = optly_command(
+    "app",
+    .flags = optly_flags(
+      optly_flag_int64("value", .shortname = 'x')
+    )
+  );
 
-  reset_flags(g_flags);
-  char *vec2[] = {"-x", "99", NULL};
-  call_parse(vec2, 2, g_flags);
-  assert(g_flags[2].value.as_int64 == 99);
+  char       *argv[] = {"app", "-x=77", "-x", "99", NULL};
+  OptlyErrors errs   = optly_parse_args(4, argv, &cmd);
+  // Последнее значение перезапишет предыдущее
+  assert_err_count(&errs, 0);
+  ASSERT_EQ_INT(optly_flag_value_int64(&cmd, "value"), 99);
 }
 
-static void test_string_value(void) {
-  reset_flags(g_flags);
-  char *vec1[] = {"--name=Alice", NULL};
-  call_parse(vec1, 1, g_flags);
-  assert(g_flags[3].value.as_string && strcmp(g_flags[3].value.as_string, "Alice") == 0);
+static void test_typed_values(void) {
+  OptlyCommand cmd = optly_command(
+    "app",
+    .flags = optly_flags(
+      optly_flag_char("ch", .shortname = 'c'),
+      optly_flag_int8("i8", .shortname = 'a'),
+      optly_flag_int16("i16", .shortname = 'b'),
+      optly_flag_int32("i32", .shortname = 'd'),
+      optly_flag_int64("i64", .shortname = 'e'),
+      optly_flag_uint8("u8", .shortname = 'f'),
+      optly_flag_uint16("u16", .shortname = 'g'),
+      optly_flag_uint32("u32", .shortname = 'h'),
+      optly_flag_uint64("u64", .shortname = 'i'),
+      optly_flag_float("f32", .shortname = 'j'),
+      optly_flag_double("f64", .shortname = 'k')
+    )
+  );
 
-  reset_flags(g_flags);
-  char *vec2[] = {"--name", "Bob", NULL};
-  call_parse(vec2, 2, g_flags);
-  assert(g_flags[3].value.as_string && strcmp(g_flags[3].value.as_string, "Bob") == 0);
+  char *argv[] = {
+    "app",
+    "--ch=Z",
+    "--i8=-8",
+    "--i16=-16",
+    "--i32=-32",
+    "--i64=-64",
+    "--u8=8",
+    "--u16=16",
+    "--u32=32",
+    "--u64=64",
+    "--f32=1.5",
+    "--f64=2.5",
+    NULL
+  };
+  OptlyErrors errs = optly_parse_args(12, argv, &cmd);
+  assert_err_count(&errs, 0);
+  ASSERT_EQ_INT(optly_flag_value_char(&cmd, "ch"), 'Z');
+  ASSERT_EQ_INT(optly_flag_value_int8(&cmd, "i8"), -8);
+  ASSERT_EQ_INT(optly_flag_value_int16(&cmd, "i16"), -16);
+  ASSERT_EQ_INT(optly_flag_value_int32(&cmd, "i32"), -32);
+  ASSERT_EQ_INT(optly_flag_value_int64(&cmd, "i64"), -64);
+  ASSERT_EQ_INT(optly_flag_value_uint8(&cmd, "u8"), 8);
+  ASSERT_EQ_INT(optly_flag_value_uint16(&cmd, "u16"), 16);
+  ASSERT_EQ_INT(optly_flag_value_uint32(&cmd, "u32"), 32);
+  ASSERT_EQ_INT(optly_flag_value_uint64(&cmd, "u64"), 64);
+  ASSERT_FLOAT_NEAR(optly_flag_value_float(&cmd, "f32"), 1.5f, 1e-6);
+  ASSERT_FLOAT_NEAR(optly_flag_value_double(&cmd, "f64"), 2.5, 1e-9);
 }
 
-/* static void test_unknown_flag_is_ignored(void) { */
-/*     reset_flags(g_flags); */
-/*     char *vec[] = { "--doesnotexist", NULL }; */
-/*     call_parse(vec, 1, g_flags); */
-/*     assert(g_flags[0].value.as_bool == false); */
-/*     assert(g_flags[1].value.as_bool == false); */
-/*     assert(g_flags[2].value.as_int64 == 0); */
-/* } */
+static void test_commands_and_command_flags(void) {
+  OptlyCommand cmd = optly_command(
+    "app",
+    .flags = optly_flags(
+      optly_flag_bool("verbose", .shortname = 'v')
+    ),
+    .commands = optly_commands(
+      optly_command(
+        "run",
+        .flags = optly_flags(
+          optly_flag_uint16("port", .shortname = 'p', .value.as_uint16 = 8080),
+          optly_flag_bool("verbose", .shortname = 'v')
+        )
+      )
+    )
+  );
+
+  char       *argv[] = {"app", "--verbose", "run", "-p", "9000", "-v", NULL};
+  OptlyErrors errs   = optly_parse_args(6, argv, &cmd);
+  assert_err_count(&errs, 0);
+  ASSERT_TRUE(optly_flag_value_bool(&cmd, "verbose"));
+  ASSERT_TRUE(cmd.next_command != NULL);
+  ASSERT_EQ_STR(cmd.next_command->name, "run");
+  ASSERT_EQ_INT(optly_flag_value_uint16(cmd.next_command, "port"), 9000);
+  ASSERT_TRUE(optly_flag_value_bool(cmd.next_command, "verbose"));
+}
+
+static void test_subcommand_selection(void) {
+  OptlyCommand cmd = optly_command(
+    "app",
+    .commands = optly_commands(
+      optly_command(
+        "run",
+        .commands = optly_commands(optly_command("check", NULL))
+      )
+    )
+  );
+
+  char       *argv[] = {"app", "run", "check", NULL};
+  OptlyErrors errs   = optly_parse_args(3, argv, &cmd);
+  assert_err_count(&errs, 0);
+  ASSERT_TRUE(cmd.next_command != NULL);
+  ASSERT_EQ_STR(cmd.next_command->name, "run");
+  ASSERT_TRUE(cmd.next_command->next_command != NULL);
+  ASSERT_EQ_STR(cmd.next_command->next_command->name, "check");
+}
+
+static void test_positionals_and_delimiter(void) {
+  OptlyCommand cmd = optly_command(
+    "app",
+    .flags = optly_flags(
+      optly_flag_bool("verbose", .shortname = 'v')
+    ),
+    .positionals = optly_positionals(
+      optly_positional("files", .min = 1, .max = 0)  // variadic
+    )
+  );
+
+  char       *argv[] = {"app", "--", "--not-a-flag", "a.txt", "b.txt", NULL};
+  OptlyErrors errs   = optly_parse_args(5, argv, &cmd);
+  assert_err_count(&errs, 0);
+  OptlyPositional *p = optly_get_positional(&cmd, "files");
+  ASSERT_TRUE(p != NULL);
+  ASSERT_EQ_INT(p->count, 3);
+  ASSERT_EQ_STR(p->values[0], "--not-a-flag");
+  ASSERT_EQ_STR(p->values[1], "a.txt");
+  ASSERT_EQ_STR(p->values[2], "b.txt");
+}
+
+static void test_error_unknown_flag_missing_invalid(void) {
+  OptlyCommand cmd = optly_command(
+    "app",
+    .flags = optly_flags(
+      optly_flag_uint32("threads", .shortname = 't'),
+      optly_flag_int32("num", .shortname = 'n')
+    )
+  );
+
+  char       *argv[] = {"app", "--unknown", "--threads", "--num=abc", NULL};
+  OptlyErrors errs   = optly_parse_args(4, argv, &cmd);
+  assert_err_count(&errs, 3);
+  assert_err_at(&errs, 0, OPTLY_ERR_UNKNOWN_FLAG, "--unknown");
+  assert_err_at(&errs, 1, OPTLY_ERR_MISSING_VALUE, "threads");
+  assert_err_at(&errs, 2, OPTLY_ERR_INVALID_VALUE, "abc");
+}
+
+static void test_error_unknown_command(void) {
+  OptlyCommand cmd = optly_command(
+    "app",
+    .commands = optly_commands(optly_command("run", NULL))
+  );
+
+  char       *argv[] = {"app", "build", NULL};
+  OptlyErrors errs   = optly_parse_args(2, argv, &cmd);
+  assert_err_count(&errs, 1);
+  assert_err_at(&errs, 0, OPTLY_ERR_UNKNOWN_COMMAND, "build");
+}
+
+static void test_error_required_and_batch_non_bool(void) {
+  OptlyCommand cmd = optly_command(
+    "app",
+    .flags = optly_flags(
+      optly_flag_string("token", .shortname = 'T', .required = true),
+      optly_flag_uint32("threads", .shortname = 't')
+    )
+  );
+
+  char       *argv[] = {"app", "-tT", NULL};
+  OptlyErrors errs   = optly_parse_args(2, argv, &cmd);
+
+  // -tT => batch, but t is not bool => OPTLY_ERR_BATCH_NON_BOOL
+  // T required token not found => OPTLY_ERR_MISSING_REQUIRED
+  assert_err_count(&errs, 3);
+  assert_err_at(&errs, 0, OPTLY_ERR_BATCH_NON_BOOL, "t");
+  assert_err_at(&errs, 1, OPTLY_ERR_BATCH_NON_BOOL, "T");
+  assert_err_at(&errs, 2, OPTLY_ERR_MISSING_REQUIRED, "token");
+}
+
+static void test_error_positionals_too_few_and_too_many(void) {
+  // too few
+  {
+    OptlyCommand cmd = optly_command(
+      "app",
+      .positionals = optly_positionals(
+        optly_positional("src", .min = 1, .max = 1)
+      )
+    );
+
+    char       *argv[] = {"app", NULL};
+    OptlyErrors errs   = optly_parse_args(1, argv, &cmd);
+    assert_err_count(&errs, 1);
+    assert_err_at(&errs, 0, OPTLY_ERR_POSITIONAL_TOO_FEW, "src");
+  }
+  // too many
+  {
+    OptlyCommand cmd = optly_command(
+      "app",
+      .positionals = optly_positionals(
+        optly_positional("src", .min = 1, .max = 1),
+        optly_positional("dst", .min = 0, .max = 1)
+      )
+    );
+
+    char       *argv[] = {"app", "a", "b", "c", NULL};
+    OptlyErrors errs   = optly_parse_args(4, argv, &cmd);
+    assert_err_count(&errs, 1);
+    assert_err_at(&errs, 0, OPTLY_ERR_POSITIONAL_TOO_MANY, "dst");
+  }
+}
 
 int main(void) {
-  printf("\n\033[1;37mRunning optly__parse_flags tests...\033[0m\n\n");
+  fprintf(stderr, "\nRunning optly tests...\n\n");
 
-  RUN_TEST(test_long_bool_plain);
-  RUN_TEST(test_short_bool_plain);
-  RUN_TEST(test_batch_short_no_values);
-  RUN_TEST(test_batch_short_equals_errors);
-  RUN_TEST(test_long_value_equals_and_space);
+  RUN_TEST(test_optional_flags_defaults);
+  RUN_TEST(test_long_short_and_batch_bools);
+  RUN_TEST(test_inline_and_separate_values);
   RUN_TEST(test_short_value_equals_and_space);
-  RUN_TEST(test_string_value);
-  // Ignored up until ignoring warning implememnted
-  /* RUN_TEST(test_unknown_flag_is_ignored); */
+  RUN_TEST(test_typed_values);
+  RUN_TEST(test_commands_and_command_flags);
+  RUN_TEST(test_subcommand_selection);
+  RUN_TEST(test_positionals_and_delimiter);
+  RUN_TEST(test_error_unknown_flag_missing_invalid);
+  RUN_TEST(test_error_unknown_command);
+  RUN_TEST(test_error_required_and_batch_non_bool);
+  RUN_TEST(test_error_positionals_too_few_and_too_many);
 
-  printf("\n\033[1;32m✅ All tests passed!\033[0m\n");
-  return 0;
+  fprintf(stderr, "\nAsserts: %d\n", g_asserts);
+
+  if (g_failed == 0) {
+    fprintf(stderr, ANSI_GREEN("✅ All tests passed\n"));
+    return 0;
+  }
+
+  fprintf(stderr, ANSI_RED("❌ Failed: %d\n"), g_failed);
+  return 1;
 }
