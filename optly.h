@@ -1,5 +1,5 @@
 /*
-  optly.h — v2.0.0
+  optly.h — v2.0.1
   Single-header command line argument parser for C.
 
   Features
@@ -229,7 +229,7 @@
 // Versioning macros
 #define OPTLY_VERSION_MAJOR         2
 #define OPTLY_VERSION_MINOR         0
-#define OPTLY_VERSION_RELEASE       0
+#define OPTLY_VERSION_RELEASE       1
 #define OPTLY_VERSION_NUMBER        (OPTLY_VERSION_MAJOR * 100 * 100 + OPTLY_VERSION_MINOR * 100 + OPTLY_VERSION_RELEASE)
 #define OPTLY_VERSION_FULL          OPTLY_VERSION_MAJOR.OPTLY_VERSION_MINOR.OPTLY_VERSION_RELEASE
 #define OPTLY_QUOTE(str)            #str
@@ -310,6 +310,7 @@ typedef struct {
 } OptlyPositional;
 
 typedef struct OptlyCommand OptlyCommand;
+
 struct OptlyCommand {
   char *name;
   char *description;
@@ -710,7 +711,11 @@ static void optly__usage_positionals(OptlyPositional *pos) {
   fprintf(stderr, "\nPOSITIONAL ARGUMENTS\n");
 
   for (; pos->name; pos++) {
-    fprintf(stderr, "  %s  (%zu..%zu values)\n", pos->name, pos->min, pos->max ? pos->max : SIZE_MAX);
+    if (pos->max == 0) {
+      fprintf(stderr, "  %s  (%zu.. values)\n", pos->name, pos->min);
+    } else {
+      fprintf(stderr, "  %s  (%zu..%zu values)\n", pos->name, pos->min, pos->max);
+    }
   }
 }
 
@@ -1124,6 +1129,7 @@ OPTLYDEF OptlyErrors optly_parse_args(int argc, char *argv[], OptlyCommand *main
 
         if (argc == 0) {
           optly_usage(current_cmd);
+          exit(0);
           return errs;
         }
 
@@ -1137,6 +1143,7 @@ OPTLYDEF OptlyErrors optly_parse_args(int argc, char *argv[], OptlyCommand *main
         }
 
         optly_usage(cmd);
+        exit(0);
         return errs;
       }
 #endif
@@ -1186,6 +1193,7 @@ OPTLYDEF OptlyErrors optly_parse_args(int argc, char *argv[], OptlyCommand *main
 
     if (optly__help_flag.present) {
       optly_usage(current_cmd);
+      exit(0);
       return errs;
     }
 
