@@ -1279,7 +1279,6 @@ OPTLYDEF OptlyErrors optly_parse_args(int argc, char *argv[], OptlyCommand *main
 // TODO: Usage and version string customisation (usage per command)
 // TODO: Types for variadics?
 // TODO: Support different kind of numbers (0xBABA, 0123)?
-// TODO: Enum type flag support
 
 /*
    ------------------------------------------------------------------------------
