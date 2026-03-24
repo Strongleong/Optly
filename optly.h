@@ -1,218 +1,77 @@
 /*
   optly.h — v2.1.1
-  Single-header command line argument parser for C.
+  Single-header command line parser for C99.
 
-  Features
+  OVERVIEW
   --------
-  * STB-style single-header library
-  * Commands and command-specific flags
-  * Long flags (--verbose)
-  * Short flags (-v)
-  * Batched short flags (-abc)
-  * Inline flag values (--threads=4)
-  * Separate flag values (--threads 4)
-  * Typed flag values
-  * Positional arguments
-  * Optional commands
-  * Optional flags
-  * No dynamic memory allocation
-  * Portable C (C99)
+  Optly provides a static, allocation-free way to parse command line arguments
+  into a command tree. You define commands/flags/positionals at compile time,
+  call `optly_parse_args`, and read values from your configured structs.
 
-  Basic Usage
+  CORE BEHAVIOR
+  -------------
+  * Nested commands (e.g. app deploy rollback)
+  * Global and command-local flags
+  * Flag forms:
+      --name
+      -n
+      --name=value
+      --name value
+      -n=value
+      -n value
+      -abc (batch of boolean short flags only)
+  * Positional arguments with min/max validation
+  * `--` delimiter to force positional-only parsing
+  * Optional generated help:
+      #define OPTLY_GEN_HELP_FLAG     // -h / --help
+      #define OPTLY_GEN_HELP_COMMAND  // help <command>
+
+  TYPES
+  -----
+  Flags support bool, char, string, signed/unsigned integers, float/double,
+  and enum-like values (`char **` list where index 0 is current value and
+  index 1..N are allowed values).
+
+  ERROR MODEL
   -----------
+  Parsing accumulates errors into `OptlyErrors` (up to OPTLY_MAX_ERRORS):
+    OPTLY_ERR_UNKNOWN_FLAG
+    OPTLY_ERR_UNKNOWN_COMMAND
+    OPTLY_ERR_MISSING_VALUE
+    OPTLY_ERR_INVALID_VALUE
+    OPTLY_ERR_MISSING_REQUIRED
+    OPTLY_ERR_POSITIONAL_TOO_FEW
+    OPTLY_ERR_POSITIONAL_TOO_MANY
+    OPTLY_ERR_DUPLICATE_VARIADIC
+    OPTLY_ERR_BATCH_NON_BOOL
+
+  By default, Optly exits when parsing fails. Define `OPTLY_NO_EXIT` if you
+  want to handle errors yourself.
+
+  LIMITS / CONFIG
+  ---------------
+  Override these before including the header:
+    OPTLY_MAX_POSITIONALS   (default 64)
+    OPTLY_FLAG_BUFFER_LENGTH(default 256)
+    OPTLY_MAX_ERRORS        (default 32)
+
+  INTEGRATION
+  -----------
+  In one C file:
 
     #define OPTLY_IMPLEMENTATION
     #include "optly.h"
 
-    // You need to define "main" command, which is your application.
-    static OptlyCommand cmd = {
+  In other files:
 
-      // Name will be used in usage. If you set is as NULL it will be argv[0]
-      .name = NULL,
+    #include "optly.h"
 
-      // If not null, then it will be used in usage
-      .description = NULL,
+  Logging uses OPTLY_LOG(). If LOGCIE is available, Optly integrates with it;
+  otherwise it falls back to stderr logging.
 
-      // This is your "top-level global" flags. They should be specified before any command (./app --thread 2 -v)
-      .flags = (OptlyFlag[]){
-        // Long (full name)   short name   description (for usage)  Default value           Flag value  type
-        { "verbose",          'v',         "Enable verbose output", .value.as_bool = false, .type = OPTLY_TYPE_BOOL   },
-
-        // Values are unions, so you need to specify member of value with correct type some way
-        { "threads",          't',         "Worker threads", false, {.as_uint32 = 4},       OPTLY_TYPE_UINT32 },
-
-        // Flag arrays should alwasy ends with NULL_FLAG. Try to not forget about it :)
-        NULL_FLAG,
-      },
-
-      // This is your commands. (git `commit`, docker `compose` `up`)
-      .commands = (OptlyCommand[]){
-
-        // Instead of defining whole struct manually you can use helper functions
-        optly_command("run", "Runs server",
-
-          // optly_flags macro deals with type castings and closing array with NULL_FLAG
-          optly_flags(
-
-            // This is *command* flag. `./app -p 8080 run` will not work, but `./app run -p 8080` will
-            optly_flag_uint16("port", 'p', "Server port", .value.as_uint16 = 8080)
-
-            // NOTE: this flag and 'verbose' GLOBAL flag are not the same
-            // `./app -v run` - enables global -v flag
-            // `./app run -v` - enables command -v flag
-            optly_flag_bool("verbose", 'v', "Enable verbose output for worker", .value.as_bool = false)
-          ),
-
-          // This is subcommands of command "run"
-          optly_commands(
-
-            // `./app run check` subcommand have no description, flags or subcommands.
-            //  NULL is here to suppress warning about not providing argument in variadic macro
-            optly_command("check", NULL),
-
-            // `./app run dump_config` subcommands
-            optly_command("dump_config",
-
-              // We skipped description, so we need to specify fileds now
-              .flags = optly_flags(
-                optly_flag_bool("color", 'c', "Show colors", .value.as_bool = false)
-              )
-            )
-          ),
-
-          // Positioanl arguments can be defined lilke this
-          optly_positionals(optly_positional("address", "Address to listen on", .min = 0, .max = 1)),
-        ),
-      }
-    };
-
-    int main(int argc, char **argv) {
-      optly_parse_args(argc, argv, &cmd);
-
-      printf("Verbose: %s\n", optly_flag_value_bool(&cmd, "verbose") ? "true" : "false");
-      printf("Threads: %u\n", optly_flag_value_uint32(&cmd, "threads"));
-
-      if (!cmd.next_command) {
-        return 0;
-      }
-
-      printf("Command: %s\n", cmd.next_command->name);
-
-      printf("Verbose: %s\n", optly_flag_value_bool(cmd.next_command, "verbose") ? "true" : "false");
-      printf("Port: %u\n", optly_flag_value_uint16(cmd.next_command, "port"));
-
-      if (cmd.next_command->next_command) {
-        printf("Command: %s\n", cmd.next_command->next_command->name);
-      }
-
-      OptlyPositional *address = optly_get_positional(&cmd, "address");
-
-      if (address && address->count == 1) {
-        printf("Address: %s\n", address->values[1]);
-      } else {
-        printf("Address: 0.0.0.0\n");
-      }
-    }
-
-  Commands
-  --------
-
-  Commands are positional tokens that do not begin with '-'.
-
-    app build
-    app run
-
-  Each command may define its own flags.
-
-  Flags
-  -----
-
-  Flags may be long or short.
-
-    --verbose
-    -v
-
-  Flags may have values.
-
-    --threads=4
-    --threads 4
-    -t 4
-
-  Short flags can be batched.
-
-    -abc  ->  -a -b -c
-
-  Positional Arguments
-  --------------------
-
-  Any non-flag tokens after command selection are stored as positional arguments.
-
-    app build file1 file2
-
-  Access:
-
-  Named positional: (can have many valies inside)
-
-    Positional *pos = optly_get_positional(&cmd, "name");
-
-  Or directly through command:
-
-    for (OptlyPositional *p = cmd.positionals; p->name; p++) {
-      // ...
-    }
-
-  Help command/flag generation
-  ----------------------------
-
-  You can define
-
-    #define OPTLY_GEN_HELP_FLAG
-    #define OPTLY_GEN_HELP_COMMAND
-
-  to generate help flag `--help | -h` and/or help command `help cmd`.
-  If help command/flag would be found during parsing usage would be automatically called
-
-  Error and logging handling
-  --------------
-
-  This library always logs errors internally using OPTLY_LOG.
-
-  Instead of failing on first error, Optly now accumulates all errors during parsing.
-
-  `optly_parse_args()` returns an `OptlyErrors` struct:
-
-    OptlyErrors errs = optly_parse_args(argc, argv, &cmd);
-
-    for (size_t i = 0; i < optly_errors_count(&errs); i++) {
-      OptlyError e = optly_errors_at(&errs, i);
-      printf("Error: %s", optly_error_message(e.kind));
-
-      if (e.arg) {
-        printf(" (%s)", e.arg);
-      }
-
-      printf("\n");
-    }
-
-  Each error may include optional context, which could be - flag, value, command or positional name
-
-  By default, Optly will call `exit()` if any errors occurred.
-
-  To disable this behavior:
-
-    #define OPTLY_NO_EXIT
-
-  This is useful for:
-  - testing
-  - custom error handling
-
-  The best way to control logging is to use Logcie library (https://github.com/strongleong/logcie).
-  Or have a look at OPTLY_LOG family of macros.
-
-  Licese
-  ------
-
-  MIT/Public domain - choose whitchever you prefer
+  LICENSE
+  -------
+  MIT or Unlicense (public domain), your choice.
 */
 
 #ifndef OPTLY_H
