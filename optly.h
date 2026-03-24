@@ -934,13 +934,14 @@ static void optly__parse_long_flags(char ***argv_ptr, int *argc_ptr, OptlyFlag *
 #endif
 
     OPTLY_LOG(WARN, "Unknown flag: %s", arg);
-    optly__push_error(errs, OPTLY_ERR_UNKNOWN_FLAG, arg);
+    // NOTE: We can't save arg for later because it can point to local tmp (if arg was in form --flag=value)
+    optly__push_error(errs, OPTLY_ERR_UNKNOWN_FLAG, *argv);
     return;
   }
 
   flag->present = true;
 
-  if (!value && flag->type != OPTLY_TYPE_BOOL && argc > 1 && argv[1][0] != '-') {
+  if (!value && flag->type != OPTLY_TYPE_BOOL && argc > 2 && argv[1][0] != '-') {
     value = argv[1];
     SHIFT_ARG(argv, argc);
   }

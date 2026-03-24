@@ -84,14 +84,39 @@ static int g_failed  = 0;
 
 /* ------------------------------ helpers ---------------------------------- */
 
-static void assert_err_count(const OptlyErrors *errs, size_t expected) {
+static bool assert_err_count_failed = true;
+
+static void do_assert_err_count(const OptlyErrors *errs, size_t expected) {
+  assert_err_count_failed = true;
   ASSERT_EQ_INT((long long)optly_errors_count(errs), (long long)expected);
+  assert_err_count_failed = false;
+}
+
+static void assert_err_count(const OptlyErrors *errs, size_t expected) {
+  do_assert_err_count(errs, expected);
+
+  if (!assert_err_count_failed) {
+    return;
+  }
+
+  for (size_t i = 0; i < errs->count; i++) {
+    OptlyError err = errs->items[i];
+    fprintf(stderr, "      ERR: %s (%s)\n", optly_error_message(err.kind), err.arg);
+  }
 }
 
 static void assert_err_at(const OptlyErrors *errs, size_t idx, OptlyErrorKind kind, const char *arg) {
   OptlyError e = optly_errors_at(errs, idx);
   ASSERT_EQ_INT((int)e.kind, (int)kind);
   if (arg) ASSERT_EQ_STR(e.arg, arg);
+}
+
+#define ARGV(...) {__VA_ARGS__, NULL}
+
+size_t count_argc(char *argv[]) {
+  size_t i = 1;
+  for (char **v = argv; *v; v++) ++i;
+  return i;
 }
 
 /* ------------------------------ test cases -------------------------------- */
@@ -105,8 +130,8 @@ static void test_optional_flags_defaults(void) {
     )
   );
 
-  char       *argv[] = {"app", NULL};
-  OptlyErrors errs   = optly_parse_args(1, argv, &cmd);
+  char       *argv[] = ARGV("app");
+  OptlyErrors errs   = optly_parse_args(count_argc(argv), argv, &cmd);
   assert_err_count(&errs, 0);
   ASSERT_FALSE(optly_flag_value_bool(&cmd, "verbose"));
   ASSERT_EQ_INT(optly_flag_value_uint32(&cmd, "threads"), 4);
@@ -122,8 +147,8 @@ static void test_long_short_and_batch_bools(void) {
     )
   );
 
-  char       *argv[] = {"app", "-abc", NULL};
-  OptlyErrors errs   = optly_parse_args(2, argv, &cmd);
+  char       *argv[] = ARGV("app", "-abc");
+  OptlyErrors errs   = optly_parse_args(count_argc(argv), argv, &cmd);
   assert_err_count(&errs, 0);
   ASSERT_TRUE(optly_flag_value_bool(&cmd, "a"));
   ASSERT_TRUE(optly_flag_value_bool(&cmd, "b"));
@@ -139,8 +164,8 @@ static void test_inline_and_separate_values(void) {
     )
   );
 
-  char       *argv[] = {"app", "--threads=8", "--name", "Alice", NULL};
-  OptlyErrors errs   = optly_parse_args(4, argv, &cmd);
+  char       *argv[] = ARGV("app", "--threads=8", "--name", "Alice");
+  OptlyErrors errs   = optly_parse_args(count_argc(argv), argv, &cmd);
   assert_err_count(&errs, 0);
   ASSERT_EQ_INT(optly_flag_value_uint32(&cmd, "threads"), 8);
   ASSERT_EQ_STR(optly_flag_value_string(&cmd, "name"), "Alice");
@@ -154,8 +179,8 @@ static void test_short_value_equals_and_space(void) {
     )
   );
 
-  char       *argv[] = {"app", "-x=77", "-x", "99", NULL};
-  OptlyErrors errs   = optly_parse_args(4, argv, &cmd);
+  char       *argv[] = ARGV("app", "-x=77", "-x", "99");
+  OptlyErrors errs   = optly_parse_args(count_argc(argv), argv, &cmd);
   // Последнее значение перезапишет предыдущее
   assert_err_count(&errs, 0);
   ASSERT_EQ_INT(optly_flag_value_int64(&cmd, "value"), 99);
@@ -179,22 +204,9 @@ static void test_typed_values(void) {
     )
   );
 
-  char *argv[] = {
-    "app",
-    "--ch=Z",
-    "--i8=-8",
-    "--i16=-16",
-    "--i32=-32",
-    "--i64=-64",
-    "--u8=8",
-    "--u16=16",
-    "--u32=32",
-    "--u64=64",
-    "--f32=1.5",
-    "--f64=2.5",
-    NULL
-  };
-  OptlyErrors errs = optly_parse_args(12, argv, &cmd);
+  char *argv[] = ARGV("app", "--ch=Z", "--i8=-8", "--i16=-16", "--i32=-32", "--i64=-64", "--u8=8", "--u16=16", "--u32=32", "--u64=64", "--f32=1.5", "--f64=2.5");
+
+  OptlyErrors errs = optly_parse_args(count_argc(argv), argv, &cmd);
   assert_err_count(&errs, 0);
   ASSERT_EQ_INT(optly_flag_value_char(&cmd, "ch"), 'Z');
   ASSERT_EQ_INT(optly_flag_value_int8(&cmd, "i8"), -8);
@@ -226,8 +238,8 @@ static void test_commands_and_command_flags(void) {
     )
   );
 
-  char       *argv[] = {"app", "--verbose", "run", "-p", "9000", "-v", NULL};
-  OptlyErrors errs   = optly_parse_args(6, argv, &cmd);
+  char       *argv[] = ARGV("app", "--verbose", "run", "-p", "9000", "-v");
+  OptlyErrors errs   = optly_parse_args(count_argc(argv), argv, &cmd);
   assert_err_count(&errs, 0);
   ASSERT_TRUE(optly_flag_value_bool(&cmd, "verbose"));
   ASSERT_TRUE(cmd.next_command != NULL);
@@ -247,8 +259,8 @@ static void test_subcommand_selection(void) {
     )
   );
 
-  char       *argv[] = {"app", "run", "check", NULL};
-  OptlyErrors errs   = optly_parse_args(3, argv, &cmd);
+  char       *argv[] = ARGV("app", "run", "check");
+  OptlyErrors errs   = optly_parse_args(count_argc(argv), argv, &cmd);
   assert_err_count(&errs, 0);
   ASSERT_TRUE(cmd.next_command != NULL);
   ASSERT_EQ_STR(cmd.next_command->name, "run");
@@ -267,8 +279,8 @@ static void test_positionals_and_delimiter(void) {
     )
   );
 
-  char       *argv[] = {"app", "--", "--not-a-flag", "a.txt", "b.txt", NULL};
-  OptlyErrors errs   = optly_parse_args(5, argv, &cmd);
+  char       *argv[] = ARGV("app", "--", "--not-a-flag", "a.txt", "b.txt");
+  OptlyErrors errs   = optly_parse_args(count_argc(argv), argv, &cmd);
   assert_err_count(&errs, 0);
   OptlyPositional *p = optly_get_positional(&cmd, "files");
   ASSERT_TRUE(p != NULL);
@@ -287,8 +299,8 @@ static void test_error_unknown_flag_missing_invalid(void) {
     )
   );
 
-  char       *argv[] = {"app", "--unknown", "--threads", "--num=abc", NULL};
-  OptlyErrors errs   = optly_parse_args(4, argv, &cmd);
+  char       *argv[] = ARGV("app", "--unknown", "--threads", "--num=abc");
+  OptlyErrors errs   = optly_parse_args(count_argc(argv), argv, &cmd);
   assert_err_count(&errs, 3);
   assert_err_at(&errs, 0, OPTLY_ERR_UNKNOWN_FLAG, "--unknown");
   assert_err_at(&errs, 1, OPTLY_ERR_MISSING_VALUE, "threads");
@@ -301,8 +313,8 @@ static void test_error_unknown_command(void) {
     .commands = optly_commands(optly_command("run", NULL))
   );
 
-  char       *argv[] = {"app", "build", NULL};
-  OptlyErrors errs   = optly_parse_args(2, argv, &cmd);
+  char       *argv[] = ARGV("app", "build");
+  OptlyErrors errs   = optly_parse_args(count_argc(argv), argv, &cmd);
   assert_err_count(&errs, 1);
   assert_err_at(&errs, 0, OPTLY_ERR_UNKNOWN_COMMAND, "build");
 }
@@ -316,8 +328,8 @@ static void test_error_required_and_batch_non_bool(void) {
     )
   );
 
-  char       *argv[] = {"app", "-tT", NULL};
-  OptlyErrors errs   = optly_parse_args(2, argv, &cmd);
+  char       *argv[] = ARGV("app", "-tT");
+  OptlyErrors errs   = optly_parse_args(count_argc(argv), argv, &cmd);
 
   // -tT => batch, but t is not bool => OPTLY_ERR_BATCH_NON_BOOL
   // T required token not found => OPTLY_ERR_MISSING_REQUIRED
@@ -337,8 +349,8 @@ static void test_error_positionals_too_few_and_too_many(void) {
       )
     );
 
-    char       *argv[] = {"app", NULL};
-    OptlyErrors errs   = optly_parse_args(1, argv, &cmd);
+    char       *argv[] = ARGV("app");
+    OptlyErrors errs   = optly_parse_args(count_argc(argv), argv, &cmd);
     assert_err_count(&errs, 1);
     assert_err_at(&errs, 0, OPTLY_ERR_POSITIONAL_TOO_FEW, "src");
   }
@@ -352,11 +364,90 @@ static void test_error_positionals_too_few_and_too_many(void) {
       )
     );
 
-    char       *argv[] = {"app", "a", "b", "c", NULL};
-    OptlyErrors errs   = optly_parse_args(4, argv, &cmd);
+    char       *argv[] = ARGV("app", "a", "b", "c");
+    OptlyErrors errs   = optly_parse_args(count_argc(argv), argv, &cmd);
     assert_err_count(&errs, 1);
     assert_err_at(&errs, 0, OPTLY_ERR_POSITIONAL_TOO_MANY, "dst");
   }
+}
+
+static void test_enum_default_and_parse(void) {
+  OptlyCommand cmd = {
+    "app",
+    .flags = optly_flags(
+      optly_flag_enum("log", 'l', optly_enum_values("verbose", "debug", "verbose", "warn"))
+    )
+  };
+
+  // No args -> default value
+  {
+    char       *argv[] = ARGV("app");
+    OptlyErrors errs   = optly_parse_args(count_argc(argv), argv, &cmd);
+    assert_err_count(&errs, 0);
+    ASSERT_EQ_STR(optly_flag_value_enum(&cmd, "log"), "verbose");
+  }
+
+  // Explicit value
+  {
+    char       *argv[] = ARGV("app", "--log=warn");
+    OptlyErrors errs   = optly_parse_args(count_argc(argv), argv, &cmd);
+    assert_err_count(&errs, 0);
+    ASSERT_EQ_STR(optly_flag_value_enum(&cmd, "log"), "warn");
+  }
+}
+
+static void test_enum_errors(void) {
+  OptlyCommand cmd = {
+    "app",
+    .flags = optly_flags(
+      optly_flag_enum("mode", 'm', optly_enum_values("fast", "fast", "slow"))
+    )
+  };
+
+  {
+    char       *argv[] = ARGV("app", "--mode=invalid");
+    OptlyErrors errs   = optly_parse_args(count_argc(argv), argv, &cmd);
+    assert_err_count(&errs, 1);
+    assert_err_at(&errs, 0, OPTLY_ERR_INVALID_VALUE, "invalid");
+  }
+
+  {
+    char       *argv[] = ARGV("app", "--mode");
+    OptlyErrors errs   = optly_parse_args(count_argc(argv), argv, &cmd);
+    assert_err_count(&errs, 1);
+    assert_err_at(&errs, 0, OPTLY_ERR_MISSING_VALUE, "mode");
+  }
+}
+
+static void test_enum_short_and_overwrite(void) {
+  OptlyCommand cmd = {
+    "app",
+    .flags = optly_flags(
+      optly_flag_enum("level", 'l', optly_enum_values("low", "low", "mid", "high"))
+    )
+  };
+
+  char       *argv[] = ARGV("app", "-l=mid", "-l", "high");
+  OptlyErrors errs   = optly_parse_args(count_argc(argv), argv, &cmd);
+  assert_err_count(&errs, 0);
+  ASSERT_EQ_STR(optly_flag_value_enum(&cmd, "level"), "high");
+}
+
+static void test_enum_mixed_with_other_flags(void) {
+  OptlyCommand cmd = {
+    "app",
+    .flags = optly_flags(
+      optly_flag_enum("log", 'l', optly_enum_values("warn", "debug", "info", "warn")),
+      optly_flag_uint32("threads", 't', .value.as_uint32 = 2)
+    )
+  };
+
+  char       *argv[] = ARGV("app", "--log=info", "--threads", "8");
+  OptlyErrors errs   = optly_parse_args(count_argc(argv), argv, &cmd);
+
+  assert_err_count(&errs, 0);
+  ASSERT_EQ_STR(optly_flag_value_enum(&cmd, "log"), "info");
+  ASSERT_EQ_INT(optly_flag_value_uint32(&cmd, "threads"), 8);
 }
 
 int main(void) {
@@ -374,6 +465,10 @@ int main(void) {
   RUN_TEST(test_error_unknown_command);
   RUN_TEST(test_error_required_and_batch_non_bool);
   RUN_TEST(test_error_positionals_too_few_and_too_many);
+  RUN_TEST(test_enum_default_and_parse);
+  RUN_TEST(test_enum_errors);
+  RUN_TEST(test_enum_short_and_overwrite);
+  RUN_TEST(test_enum_mixed_with_other_flags);
 
   fprintf(stderr, "\nAsserts: %d\n", g_asserts);
 
