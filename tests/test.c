@@ -99,10 +99,7 @@ static void assert_err_count(const OptlyErrors *errs, size_t expected) {
     return;
   }
 
-  for (size_t i = 0; i < errs->count; i++) {
-    OptlyError err = errs->items[i];
-    fprintf(stderr, "      ERR: %s (%s)\n", optly_error_message(err.kind), err.arg);
-  }
+  optly_error_print(errs);
 }
 
 static void assert_err_at(const OptlyErrors *errs, size_t idx, OptlyErrorKind kind, const char *arg) {

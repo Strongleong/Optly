@@ -1,5 +1,5 @@
 /*
-  optly.h — v2.1.1
+  optly.h — v2.2.0
   Single-header command line argument parser for C.
 
   Features
@@ -228,8 +228,8 @@
 
 // Versioning macros
 #define OPTLY_VERSION_MAJOR         2
-#define OPTLY_VERSION_MINOR         1
-#define OPTLY_VERSION_RELEASE       1
+#define OPTLY_VERSION_MINOR         2
+#define OPTLY_VERSION_RELEASE       0
 #define OPTLY_VERSION_NUMBER        (OPTLY_VERSION_MAJOR * 100 * 100 + OPTLY_VERSION_MINOR * 100 + OPTLY_VERSION_RELEASE)
 #define OPTLY_VERSION_FULL          OPTLY_VERSION_MAJOR.OPTLY_VERSION_MINOR.OPTLY_VERSION_RELEASE
 #define OPTLY_QUOTE(str)            #str
@@ -351,6 +351,7 @@ typedef struct OptlyErrors {
 OPTLYDEF size_t      optly_errors_count(const OptlyErrors *errs);
 OPTLYDEF OptlyError  optly_errors_at(const OptlyErrors *errs, size_t i);
 OPTLYDEF const char *optly_error_message(OptlyErrorKind err);
+OPTLYDEF void        optly_error_print(const OptlyErrors *errs);
 
 #define NULL_FLAG       {.fullname = NULL, .shortname = 0, .value = {.as_int64 = 0}, .type = 0}
 #define NULL_COMMAND    {.name = NULL, .flags = NULL}
@@ -498,6 +499,12 @@ OPTLYDEF const char *optly_error_message(OptlyErrorKind err) {
 
   assert(err >= OPTLY_OK && err < Count_OptlyError);
   return error_messages[err];
+}
+
+OPTLYDEF void optly_error_print(const OptlyErrors *errs) {
+  for (size_t i = 0; i < errs->count; i++) {
+    fprintf(stdout, "ERROR: %s (%s)\n", optly_error_message(errs->items[i].kind), errs->items[i].arg);
+  }
 }
 
 static void optly__push_error(OptlyErrors *errs, OptlyErrorKind err, const char *arg) {

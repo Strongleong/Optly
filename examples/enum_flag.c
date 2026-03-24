@@ -20,14 +20,7 @@ static OptlyCommand cmd = {
 };
 
 int main(int argc, char **argv) {
-  OptlyErrors errs = optly_parse_args(argc, argv, &cmd);
-
-  if (errs.count > 0) {
-    for (size_t i = 0; i < errs.count; i++) {
-      fprintf(stderr, "ERR: %s\n", optly_error_message(errs.items[i].kind));
-      return 1;
-    }
-  }
+  optly_parse_args(argc, argv, &cmd);
 
   // You can get the value with handy accessor function, as always
   printf("level %s\n", optly_flag_value_enum(&cmd, "level"));
