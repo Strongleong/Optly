@@ -181,7 +181,8 @@ static void test_short_value_equals_and_space(void) {
 
   char       *argv[] = ARGV("app", "-x=77", "-x", "99");
   OptlyErrors errs   = optly_parse_args(count_argc(argv), argv, &cmd);
-  // Последнее значение перезапишет предыдущее
+
+  // New value will override last one
   assert_err_count(&errs, 0);
   ASSERT_EQ_INT(optly_flag_value_int64(&cmd, "value"), 99);
 }
