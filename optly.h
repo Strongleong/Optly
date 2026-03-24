@@ -941,7 +941,7 @@ static void optly__parse_long_flags(char ***argv_ptr, int *argc_ptr, OptlyFlag *
 
   flag->present = true;
 
-  if (!value && flag->type != OPTLY_TYPE_BOOL && argc > 2 && argv[1][0] != '-') {
+  if (!value && flag->type != OPTLY_TYPE_BOOL && argv[1] && argv[1][0] != '-') {
     value = argv[1];
     SHIFT_ARG(argv, argc);
   }
