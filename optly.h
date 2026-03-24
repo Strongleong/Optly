@@ -407,10 +407,8 @@ OPTLYDEF const char *optly_error_message(OptlyErrorKind err);
 
 OPTLYDEF OptlyErrors optly_parse_args(int argc, char *argv[], OptlyCommand *main_cmd);
 
+OPTLYDEF bool             optly_is_command(OptlyCommand *command, const char *name);
 OPTLYDEF const OptlyFlag *optly_get_flag(const OptlyFlag *flags, const char *name);
-
-OPTLYDEF bool optly_is_command(OptlyCommand *command, const char *name);
-
 OPTLYDEF OptlyPositional *optly_get_positional(OptlyCommand *command, const char *name);
 
 OPTLYDEF void optly_usage(OptlyCommand *command);
@@ -467,36 +465,6 @@ inline OPTLYDEF OptlyPositional *optly_get_positional(OptlyCommand *command, con
   } while (0)
 #endif
 #endif
-
-typedef struct OptlyEnumDef {
-  const char  *flag_name;
-  const char **values;  // NULL - terminated array
-} OptlyEnumDef;
-
-#define OPTLY_ENUM_DEFS_CAP 64
-
-static OptlyEnumDef optly__enum_defs[OPTLY_ENUM_DEFS_CAP];
-static size_t       optly__enum_defs_count = 0;
-
-void optly__register_enum(const char *name, const char **values) {
-  for (size_t i = 0; i < optly__enum_defs_count; i++) {
-    if (strcmp(optly__enum_defs[i].flag_name, name) == 0) {
-      return;
-    }
-  }
-
-  optly__enum_defs[optly__enum_defs_count++] = (OptlyEnumDef){name, values};
-}
-
-// static const char **optly__get_enum(const char *name) {
-//   for (size_t i = 0; i < optly__enum_defs_count; i++) {
-//     if (strcmp(optly__enum_defs[i].flag_name, name) == 0) {
-//       return optly__enum_defs[i].values;
-//     }
-//   }
-//
-//   return NULL;
-// }
 
 #define SHIFT_ARG(argv, argc) (++(argv), --(argc))
 
@@ -839,7 +807,7 @@ static void optly__flag_set_value(OptlyFlag *flag, char *value, OptlyErrors *err
     flag->value.as_int64 = 0;
   }
 
-  char *end            = "";
+  char *end = "";
 
   switch (flag->type) {
     case OPTLY_TYPE_CHAR:   flag->value.as_char = *value; break;
