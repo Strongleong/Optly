@@ -1292,7 +1292,7 @@ OPTLYDEF OptlyErrors optly_parse_args(int argc, char *argv[], OptlyCommand *main
    This software is available under 2 licenses -- choose whichever you prefer.
    ------------------------------------------------------------------------------
    ALTERNATIVE A - MIT License
-   Copyright (c) 2026 Nikita Chukov nikita_chul@mail.ru
+   Copyright (c) 2026 Nikita Chulkov nikita_chul@mail.ru
    Permission is hereby granted, free of charge, to any person obtaining a copy of
    this software and associated documentation files (the "Software"), to deal in
    the Software without restriction, including without limitation the rights to
