@@ -5,6 +5,8 @@ Optly is a **single-header command line argument parser for C (C99)**.
 It is designed to be **small, dependency‑free, and allocation‑free**,
 making it ideal for small CLI tools and embedded-style programs.
 
+[![.github/workflows/main.yml](https://github.com/Strongleong/Optly/actions/workflows/main.yml/badge.svg)](https://github.com/Strongleong/Optly/actions/workflows/main.yml)
+
 ## Features
 
 -   Single-header library
