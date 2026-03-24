@@ -89,8 +89,8 @@
     int main(int argc, char **argv) {
       optly_parse_args(argc, argv, &cmd);
 
-      printf("Verbose: %s\n", optly_bool(&cmd, "verbose") ? "true" : "false");
-      printf("Threads: %u\n", optly_uint32(&cmd, "threads"));
+      printf("Verbose: %s\n", optly_flag_value_bool(&cmd, "verbose") ? "true" : "false");
+      printf("Threads: %u\n", optly_flag_value_uint32(&cmd, "threads"));
 
       if (!cmd.next_command) {
         return 0;
@@ -98,8 +98,8 @@
 
       printf("Command: %s\n", cmd.next_command->name);
 
-      printf("Verbose: %s\n", optly_bool(cmd.next_command, "verbose") ? "true" : "false");
-      printf("Port: %u\n", optly_uint16(cmd.next_command, "port"));
+      printf("Verbose: %s\n", optly_flag_value_bool(cmd.next_command, "verbose") ? "true" : "false");
+      printf("Port: %u\n", optly_flag_value_uint16(cmd.next_command, "port"));
 
       if (cmd.next_command->next_command) {
         printf("Command: %s\n", cmd.next_command->next_command->name);
@@ -264,13 +264,15 @@ typedef enum OptlyFlagType {
   OPTLY_TYPE_UINT64,
   OPTLY_TYPE_FLOAT,
   OPTLY_TYPE_DOUBLE,
+  OPTLY_TYPE_ENUM,
 } OptlyFlagType;
 
 typedef union OptlyFlagValue {
   bool as_bool;
 
-  char  as_char;
-  char *as_string;
+  char   as_char;
+  char  *as_string;
+  char **as_enum;
 
   int8_t  as_int8;
   int16_t as_int16;
@@ -396,24 +398,16 @@ OPTLYDEF const char *optly_error_message(OptlyErrorKind err);
 #define optly_flag_uint64(name, ...) optly_flag(name, __VA_ARGS__, .type = OPTLY_TYPE_UINT64)
 #define optly_flag_float(name, ...)  optly_flag(name, __VA_ARGS__, .type = OPTLY_TYPE_FLOAT)
 #define optly_flag_double(name, ...) optly_flag(name, __VA_ARGS__, .type = OPTLY_TYPE_DOUBLE)
+#define optly_flag_enum(name, ...)   optly_flag(name, __VA_ARGS__, .type = OPTLY_TYPE_ENUM)
+
+#define optly_enum_values(default, ...) \
+  .value.as_enum = (char *[]) {         \
+    default, __VA_ARGS__, NULL          \
+  }
 
 OPTLYDEF OptlyErrors optly_parse_args(int argc, char *argv[], OptlyCommand *main_cmd);
 
 OPTLYDEF const OptlyFlag *optly_get_flag(const OptlyFlag *flags, const char *name);
-
-OPTLYDEF bool     optly_bool(OptlyCommand *command, const char *name);
-OPTLYDEF char     optly_char(OptlyCommand *command, const char *name);
-OPTLYDEF char    *optly_string(OptlyCommand *command, const char *name);
-OPTLYDEF int8_t   optly_int8(OptlyCommand *command, const char *name);
-OPTLYDEF int16_t  optly_int16(OptlyCommand *command, const char *name);
-OPTLYDEF int32_t  optly_int32(OptlyCommand *command, const char *name);
-OPTLYDEF int64_t  optly_int64(OptlyCommand *command, const char *name);
-OPTLYDEF uint8_t  optly_uint8(OptlyCommand *command, const char *name);
-OPTLYDEF uint16_t optly_uint16(OptlyCommand *command, const char *name);
-OPTLYDEF uint32_t optly_uint32(OptlyCommand *command, const char *name);
-OPTLYDEF uint64_t optly_uint64(OptlyCommand *command, const char *name);
-OPTLYDEF float    optly_float(OptlyCommand *command, const char *name);
-OPTLYDEF double   optly_double(OptlyCommand *command, const char *name);
 
 OPTLYDEF bool optly_is_command(OptlyCommand *command, const char *name);
 
@@ -474,12 +468,42 @@ inline OPTLYDEF OptlyPositional *optly_get_positional(OptlyCommand *command, con
 #endif
 #endif
 
+typedef struct OptlyEnumDef {
+  const char  *flag_name;
+  const char **values;  // NULL - terminated array
+} OptlyEnumDef;
+
+#define OPTLY_ENUM_DEFS_CAP 64
+
+static OptlyEnumDef optly__enum_defs[OPTLY_ENUM_DEFS_CAP];
+static size_t       optly__enum_defs_count = 0;
+
+void optly__register_enum(const char *name, const char **values) {
+  for (size_t i = 0; i < optly__enum_defs_count; i++) {
+    if (strcmp(optly__enum_defs[i].flag_name, name) == 0) {
+      return;
+    }
+  }
+
+  optly__enum_defs[optly__enum_defs_count++] = (OptlyEnumDef){name, values};
+}
+
+// static const char **optly__get_enum(const char *name) {
+//   for (size_t i = 0; i < optly__enum_defs_count; i++) {
+//     if (strcmp(optly__enum_defs[i].flag_name, name) == 0) {
+//       return optly__enum_defs[i].values;
+//     }
+//   }
+//
+//   return NULL;
+// }
+
 #define SHIFT_ARG(argv, argc) (++(argv), --(argc))
 
-#define UNREACHABLE(message)                                                \
-  do {                                                                      \
-    OPTLY_LOG(FATAL, "%s:%d: UNREACHABLE: %s", __FILE__, __LINE__, message) \
-    abort();                                                                \
+#define UNREACHABLE(message)                                                 \
+  do {                                                                       \
+    OPTLY_LOG(FATAL, "%s:%d: UNREACHABLE: %s", __FILE__, __LINE__, message); \
+    abort();                                                                 \
   } while (0)
 
 static const char *error_messages[] = {
@@ -494,6 +518,8 @@ static const char *error_messages[] = {
   [OPTLY_ERR_DUPLICATE_VARIADIC]  = "Duplicate variadic positional",
   [OPTLY_ERR_BATCH_NON_BOOL]      = "Cannot batch non-boolean flags",
 };
+
+static const char *flag_enum[] = {0};
 
 OPTLYDEF const char *optly_error_message(OptlyErrorKind err) {
 #if __STDC_VERSION__ >= 201112L  // Check for C11 support
@@ -589,6 +615,7 @@ static const char *optly__flag_type_name(OptlyFlagType type) {
     case OPTLY_TYPE_UINT64: return "<u64>";
     case OPTLY_TYPE_FLOAT:  return "<float>";
     case OPTLY_TYPE_DOUBLE: return "<double>";
+    case OPTLY_TYPE_ENUM:   return "<enum>";
   }
 
   return "";
@@ -677,8 +704,30 @@ static void optly__usage_flags(OptlyFlag *flags) {
   size_t pad = optly__flag_print_width(flags);
 
   for (OptlyFlag *flag = flags; !optly_is_flag_null(flag); flag++) {
-    char        buf[OPTLY_FLAG_BUFFER_LENGTH];
-    const char *type = optly__flag_type_name(flag->type);
+    char buf[OPTLY_FLAG_BUFFER_LENGTH];
+
+    // const char *type = optly__flag_type_name(flag->type);
+    char type_buf[OPTLY_FLAG_BUFFER_LENGTH];
+
+    if (flag->type == OPTLY_TYPE_ENUM && flag->value.as_enum) {
+      char **vals = flag->value.as_enum;
+
+      size_t offset = 0;
+      offset += snprintf(type_buf + offset, sizeof(type_buf) - offset, "[");
+
+      for (char **v = vals + 1; *v; v++) {
+        offset += snprintf(type_buf + offset, sizeof(type_buf) - offset, "%s", *v);
+        if (*(v + 1)) {
+          offset += snprintf(type_buf + offset, sizeof(type_buf) - offset, "|");
+        }
+      }
+
+      snprintf(type_buf + offset, sizeof(type_buf) - offset, "]");
+    } else {
+      snprintf(type_buf, sizeof(type_buf), "%s", optly__flag_type_name(flag->type));
+    }
+
+    const char *type = type_buf;
 
     if (flag->shortname && flag->fullname) {
       snprintf(buf, sizeof(buf), "-%c --%s %s", flag->shortname, flag->fullname, type);
@@ -692,6 +741,10 @@ static void optly__usage_flags(OptlyFlag *flags) {
 
     if (flag->required) {
       fprintf(stderr, " (required)");
+    } else if (flag->type == OPTLY_TYPE_ENUM && flag->value.as_enum) {
+      if (flag->value.as_enum[0]) {
+        fprintf(stderr, " (default: %s)", flag->value.as_enum[0]);
+      }
     } else if (flag->value.as_string != NULL) {
       optly__print_default_value(flag);
     }
@@ -782,7 +835,10 @@ static void optly__flag_set_value(OptlyFlag *flag, char *value, OptlyErrors *err
     return;
   }
 
-  flag->value.as_int64 = 0;
+  if (flag->type != OPTLY_TYPE_ENUM) {
+    flag->value.as_int64 = 0;
+  }
+
   char *end            = "";
 
   switch (flag->type) {
@@ -799,6 +855,26 @@ static void optly__flag_set_value(OptlyFlag *flag, char *value, OptlyErrors *err
     case OPTLY_TYPE_FLOAT:  flag->value.as_float = strtof(value, &end); break;
     case OPTLY_TYPE_DOUBLE: flag->value.as_double = strtod(value, &end); break;
     case OPTLY_TYPE_BOOL:   flag->value.as_bool = true; break;
+    case OPTLY_TYPE_ENUM:   {
+      char **vals  = flag->value.as_enum;
+      bool   valid = false;
+
+      for (char **v = vals + 1; *v; v++) {
+        if (strcmp(*v, value) == 0) {
+          valid = true;
+          break;
+        }
+      }
+
+      if (!valid) {
+        OPTLY_LOG(ERROR, "Invalid enum value '%s' for --%s", value, flag->fullname);
+        optly__push_error(errs, OPTLY_ERR_INVALID_VALUE, value);
+        return;
+      }
+
+      flag->value.as_enum[0] = value;
+      break;
+    }
   }
 
   if (*end != '\0') {
@@ -1072,6 +1148,11 @@ inline OPTLYDEF float optly_flag_value_float(const OptlyCommand *command, const 
 inline OPTLYDEF double optly_flag_value_double(const OptlyCommand *command, const char *name) {
   const OptlyFlag *flag = optly_get_flag(command->flags, name);
   return flag ? flag->value.as_double : 0;
+}
+
+inline OPTLYDEF char *optly_flag_value_enum(const OptlyCommand *command, const char *name) {
+  const OptlyFlag *flag = optly_get_flag(command->flags, name);
+  return flag ? flag->value.as_enum[0] : NULL;
 }
 
 inline OPTLYDEF OptlyPositional *optly_get_positional(OptlyCommand *command, const char *name) {
