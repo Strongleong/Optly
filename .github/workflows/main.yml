@@ -3,14 +3,12 @@ name: Build and Test
 on:
   push:
     branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
-
-      - name: Build and test
-        run: ./build.sh && ./out test
+        - uses: actions/checkout@v4
+        - run: ./build.sh && ./out test
