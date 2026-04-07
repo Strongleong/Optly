@@ -161,7 +161,7 @@
       // ...
     }
 
-  Help command/flag generation
+  Help and version command/flag generation
   ----------------------------
 
   You can define
@@ -169,8 +169,17 @@
     #define OPTLY_GEN_HELP_FLAG
     #define OPTLY_GEN_HELP_COMMAND
 
-  to generate help flag `--help | -h` and/or help command `help cmd`.
-  If help command/flag would be found during parsing usage would be automatically called
+  to generate help flag `--help | -h` and/or help command `help cmd`, or
+
+  #define OPTLY_GEN_VERSION_FLAG
+  #define OPTLY_GEN_VERSION_COMMAND
+
+  to generate version flag `--version | -v` and/or version command `version`.
+
+  If help/version command/flag would be found during parsing usage would be
+  automatically called and `exit(0)` is called.
+
+  Note that user defined flags with `-h`/`-v` would interfere with generated flags.
 
   Error and logging handling
   --------------
@@ -406,7 +415,11 @@ OPTLYDEF void        optly_error_print(const OptlyErrors *errs);
     default, __VA_ARGS__, NULL          \
   }
 
+#if defined(OPTLY_GEN_VERSION_FLAG) || defined(OPTLY_GEN_VERSION_COMMAND)
+OPTLYDEF OptlyErrors optly_parse_args(int argc, char *argv[], OptlyCommand *main_cmd, const char *version);
+#else
 OPTLYDEF OptlyErrors optly_parse_args(int argc, char *argv[], OptlyCommand *main_cmd);
+#endif
 
 OPTLYDEF bool             optly_is_command(OptlyCommand *command, const char *name);
 OPTLYDEF const OptlyFlag *optly_get_flag(const OptlyFlag *flags, const char *name);
@@ -669,6 +682,10 @@ static void optly__usage_commands_list(OptlyCommand *commands) {
 #ifdef OPTLY_GEN_HELP_COMMAND
   fprintf(stderr, "  %-*s  %s\n", (int)pad, "help", "Show help for command");
 #endif
+
+#ifdef OPTLY_GEN_VERSION_COMMAND
+  fprintf(stderr, "  %-*s  %s\n", (int)pad, "version", "Show app version");
+#endif
 }
 
 static void optly__usage_flags(OptlyFlag *flags) {
@@ -728,8 +745,11 @@ static void optly__usage_flags(OptlyFlag *flags) {
   }
 
 #ifdef OPTLY_GEN_HELP_FLAG
-  char *help = "-h --help";
-  fprintf(stderr, "\n  %-*s Show this message\n", (int)pad, help);
+  fprintf(stderr, "\n  %-*s  Show this message\n", (int)pad + type_name_pad, "-h --help");
+#endif
+
+#ifdef OPTLY_GEN_VERSION_FLAG
+  fprintf(stderr, "  %-*s  Show version\n", (int)pad + type_name_pad, "-v --version");
 #endif
 }
 
@@ -776,6 +796,21 @@ static OptlyFlag optly__help_flag = {
 static OptlyCommand optly__help_command = {
   .name        = "help",
   .description = "Show help for command"
+};
+
+static OptlyFlag optly__version_flag = {
+  .fullname    = "version",
+  .shortname   = 'v',
+  .description = "Show version",
+  .required    = false,
+  .present     = false,
+  .value       = {.as_bool = false},
+  .type        = OPTLY_TYPE_BOOL
+};
+
+static OptlyCommand optly__version_command = {
+  .name        = "version",
+  .description = "Show version"
 };
 
 /**
@@ -880,6 +915,13 @@ static void optly__parse_batch_flags(char *arg, OptlyFlag *flags, OptlyErrors *e
       }
 #endif
 
+#ifdef OPTLY_GEN_VERSION_FLAG
+      if (strcmp(sarg, "-v") == 0) {
+        optly__version_flag.present = true;
+        continue;
+      }
+#endif
+
       OPTLY_LOG(WARN, "Unknown short flag: %s", sarg);
       optly__push_error(errs, OPTLY_ERR_UNKNOWN_FLAG, &flag->shortname);
 
@@ -936,6 +978,13 @@ static void optly__parse_long_flags(char ***argv_ptr, int *argc_ptr, OptlyFlag *
 #ifdef OPTLY_GEN_HELP_FLAG
     if (strcmp(arg, "--help") == 0 || strcmp(arg, "-h") == 0) {
       optly__help_flag.present = true;
+      return;
+    }
+#endif
+
+#ifdef OPTLY_GEN_VERSION_FLAG
+    if (strcmp(arg, "--version") == 0 || strcmp(arg, "-v") == 0) {
+      optly__version_flag.present = true;
       return;
     }
 #endif
@@ -1141,7 +1190,11 @@ inline OPTLYDEF OptlyPositional *optly_get_positional(OptlyCommand *command, con
   return NULL;
 }
 
+#if defined(OPTLY_GEN_VERSION_FLAG) || defined(OPTLY_GEN_VERSION_COMMAND)
+OPTLYDEF OptlyErrors optly_parse_args(int argc, char *argv[], OptlyCommand *main_cmd, const char *version) {
+#else
 OPTLYDEF OptlyErrors optly_parse_args(int argc, char *argv[], OptlyCommand *main_cmd) {
+#endif
   assert(argc > 0);
   OptlyErrors errs = {0};
 
@@ -1205,6 +1258,14 @@ OPTLYDEF OptlyErrors optly_parse_args(int argc, char *argv[], OptlyCommand *main
       }
 #endif
 
+#ifdef OPTLY_GEN_VERSION_COMMAND
+      if (strcmp(arg, "version") == 0) {
+        fprintf(stderr, "%s: %s\n", main_cmd->name, version);
+        exit(0);
+        return errs;
+      }
+#endif
+
       if (!cmd) {
         if (current_cmd->positionals) {
           optly__push_positional(current_cmd, arg);
@@ -1254,6 +1315,14 @@ OPTLYDEF OptlyErrors optly_parse_args(int argc, char *argv[], OptlyCommand *main
       return errs;
     }
 
+    #ifdef OPTLY_GEN_VERSION_FLAG
+    if (optly__version_flag.present) {
+      fprintf(stderr, "%s: %s\n", main_cmd->name, version);
+      exit(0);
+      return errs;
+    }
+    #endif
+
     SHIFT_ARG(argv, argc);
   }
 
@@ -1283,7 +1352,6 @@ OPTLYDEF OptlyErrors optly_parse_args(int argc, char *argv[], OptlyCommand *main
 
 #endif  // OPTLY_IMPLEMENTATION
 
-// TODO: Usage and version string customisation (usage per command)
 // TODO: Types for variadics?
 // TODO: Support different kind of numbers (0xBABA, 0123)?
 

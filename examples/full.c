@@ -4,6 +4,8 @@
 
 #define OPTLY_GEN_HELP_FLAG
 #define OPTLY_GEN_HELP_COMMAND
+#define OPTLY_GEN_VERSION_FLAG
+#define OPTLY_GEN_VERSION_COMMAND
 #define OPTLY_IMPLEMENTATION
 #include <optly.h>
 
@@ -12,7 +14,7 @@ static OptlyCommand cmd = optly_command(
   "Full example of optly usage",
 
   optly_flags(
-    optly_flag_bool("verbose", 'v', "Enable verbose logging"),
+    optly_flag_bool("verbose", 'b', "Enable verbose logging"),
     optly_flag_string("config", 'c', "Config file path", .value.as_string = "./config"),
     optly_flag_string("env", 'e', "Environment (dev, staging, prod)", .value.as_string = "dev"),
     optly_flag_bool("json", 'j', "Output JSON")
@@ -192,7 +194,7 @@ void services(OptlyCommand *cmd) {
 }
 
 int main(int argc, char *argv[]) {
-  optly_parse_args(argc, argv, &cmd);
+  optly_parse_args(argc, argv, &cmd, "v1.0.0");
 
   printf("Global flags:\n");
   printf("verbose = %s\n", optly_flag_value_bool(&cmd, "verbose") ? "true" : "false");
