@@ -22,6 +22,8 @@ making it ideal for small CLI tools and embedded-style programs.
 -   Typed flag values
 -   Positional arguments
 -   Optional and required flags
+-   Optional automatic generation and handling of `--help/-h` and `--version/-v` flags
+-   Optional automatic generation and handling of `help` / `help cmd` and `version` commands
 
 ## Installation
 
@@ -162,6 +164,30 @@ Print command usage:
 ``` c
 optly_command_usage(argv[0], command);
 ```
+
+
+## Help and version command/flag generation
+
+You can define
+
+```c
+  #define OPTLY_GEN_HELP_FLAG
+  #define OPTLY_GEN_HELP_COMMAND
+```
+
+to generate help flag `--help | -h` and/or help command `help cmd`, or
+
+```c
+#define OPTLY_GEN_VERSION_FLAG
+#define OPTLY_GEN_VERSION_COMMAND
+```
+
+to generate version flag `--version | -v` and/or version command `version`.
+
+If help/version command/flag would be found during parsing usage would be
+automatically called and `exit(0)` is called.
+
+Note that user defined flags with `-h`/`-v` would interfere with generated flags.
 
 ## Design Goals
 
