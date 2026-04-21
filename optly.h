@@ -259,6 +259,14 @@
 #define OPTLY_MAX_ERRORS 32
 #endif
 
+#ifndef OPTLY_HELP_SHORT_FLAG
+#define OPTLY_HELP_SHORT_FLAG "-h"
+#endif
+
+#ifndef OPTLY_VERSION_SHORT_FLAG
+#define OPTLY_VERSION_SHORT_FLAG "-v"
+#endif
+
 typedef enum OptlyFlagType {
   OPTLY_TYPE_BOOL,
   OPTLY_TYPE_CHAR,
@@ -783,36 +791,6 @@ OPTLYDEF void optly_usage(OptlyCommand *command) {
 #endif
 }
 
-static OptlyFlag optly__help_flag = {
-  .fullname    = "help",
-  .shortname   = 'h',
-  .description = "Show this help message",
-  .required    = false,
-  .present     = false,
-  .value       = {.as_bool = false},
-  .type        = OPTLY_TYPE_BOOL
-};
-
-static OptlyCommand optly__help_command = {
-  .name        = "help",
-  .description = "Show help for command"
-};
-
-static OptlyFlag optly__version_flag = {
-  .fullname    = "version",
-  .shortname   = 'v',
-  .description = "Show version",
-  .required    = false,
-  .present     = false,
-  .value       = {.as_bool = false},
-  .type        = OPTLY_TYPE_BOOL
-};
-
-static OptlyCommand optly__version_command = {
-  .name        = "version",
-  .description = "Show version"
-};
-
 /**
  * Check if argument matches a flag definition.
  */
@@ -896,6 +874,24 @@ static void optly__flag_set_value(OptlyFlag *flag, char *value, OptlyErrors *err
   flag->present = true;
 }
 
+inline static bool optly__is_help_flag(char *arg) {
+  return strcmp(arg, "--help") == 0 ||
+         strcmp(arg, OPTLY_HELP_SHORT_FLAG) == 0 ||
+         (strlen(arg) > 2 &&
+          arg[0] == '-' &&
+          arg[1] != '-' &&
+          strchr(arg, OPTLY_HELP_SHORT_FLAG[1]) != NULL);
+}
+
+inline static bool optly__is_version_flag(char *arg) {
+  return strcmp(arg, "--version") == 0 ||
+         strcmp(arg, OPTLY_VERSION_SHORT_FLAG) == 0 ||
+         (strlen(arg) > 2 &&
+          arg[0] == '-' &&
+          arg[1] != '-' &&
+          strchr(arg, OPTLY_VERSION_SHORT_FLAG[1]) != NULL);
+}
+
 static void optly__parse_batch_flags(char *arg, OptlyFlag *flags, OptlyErrors *errs) {
   if (strchr(arg, '=') != NULL) {
     return;
@@ -908,20 +904,6 @@ static void optly__parse_batch_flags(char *arg, OptlyFlag *flags, OptlyErrors *e
     OptlyFlag *flag = optly__find_flag(sarg, flags);
 
     if (!flag) {
-#ifdef OPTLY_GEN_HELP_FLAG
-      if (strcmp(sarg, "-h") == 0) {
-        optly__help_flag.present = true;
-        continue;
-      }
-#endif
-
-#ifdef OPTLY_GEN_VERSION_FLAG
-      if (strcmp(sarg, "-v") == 0) {
-        optly__version_flag.present = true;
-        continue;
-      }
-#endif
-
       OPTLY_LOG(WARN, "Unknown short flag: %s", sarg);
       optly__push_error(errs, OPTLY_ERR_UNKNOWN_FLAG, sarg);
 
@@ -975,20 +957,6 @@ static void optly__parse_long_flags(char ***argv_ptr, int *argc_ptr, OptlyFlag *
   OptlyFlag *flag = optly__find_flag(arg, flags);
 
   if (!flag) {
-#ifdef OPTLY_GEN_HELP_FLAG
-    if (strcmp(arg, "--help") == 0 || strcmp(arg, "-h") == 0) {
-      optly__help_flag.present = true;
-      return;
-    }
-#endif
-
-#ifdef OPTLY_GEN_VERSION_FLAG
-    if (strcmp(arg, "--version") == 0 || strcmp(arg, "-v") == 0) {
-      optly__version_flag.present = true;
-      return;
-    }
-#endif
-
     OPTLY_LOG(WARN, "Unknown flag: %s", arg);
     // NOTE: We can't save arg for later because it can point to local tmp (if arg was in form --flag=value)
     optly__push_error(errs, OPTLY_ERR_UNKNOWN_FLAG, *argv);
@@ -1077,7 +1045,6 @@ static void optly__push_positional(OptlyCommand *cmd, char *value) {
     }
   }
 }
-
 
 static void optly__validate_flags(OptlyCommand *cmd, OptlyErrors *errs) {
   for (OptlyFlag *flag = cmd->flags; !optly_is_flag_null(flag); flag++) {
@@ -1236,6 +1203,20 @@ OPTLYDEF OptlyErrors optly_parse_args(int argc, char *argv[], OptlyCommand *main
       break;
     }
 
+#ifdef OPTLY_GEN_HELP_FLAG
+    if (optly__is_help_flag(arg)) {
+      optly_usage(current_cmd);
+      exit(0);
+    }
+#endif
+
+#ifdef OPTLY_GEN_VERSION_FLAG
+    if (optly__is_version_flag(arg)) {
+      fprintf(stderr, "%s: %s\n", main_cmd->name, version);
+      exit(0);
+    }
+#endif
+
     if (positional_only) {
       optly__push_positional(current_cmd, arg);
       SHIFT_ARG(argv, argc);
@@ -1252,23 +1233,9 @@ OPTLYDEF OptlyErrors optly_parse_args(int argc, char *argv[], OptlyCommand *main
       if (current_cmd->flags) {
         optly__parse_flags(&argv, &argc, current_cmd->flags, &errs);
       } else {
-        // --flag if no flags defined is positional
+        // '--flag' argument is positional if no flags defined
         optly__push_positional(current_cmd, arg);
       }
-
-      if (optly__help_flag.present) {
-        optly_usage(current_cmd);
-        exit(0);
-        return errs;
-      }
-
-#ifdef OPTLY_GEN_VERSION_FLAG
-      if (optly__version_flag.present) {
-        fprintf(stderr, "%s: %s\n", main_cmd->name, version);
-        exit(0);
-        return errs;
-      }
-#endif
 
       SHIFT_ARG(argv, argc);
       continue;
@@ -1280,24 +1247,21 @@ OPTLYDEF OptlyErrors optly_parse_args(int argc, char *argv[], OptlyCommand *main
     if (strcmp(arg, "help") == 0) {
       SHIFT_ARG(argv, argc);
 
-      if (argc == 0) {
-        optly_usage(current_cmd);
-        exit(0);
-        return errs;
+      OptlyCommand *target = current_cmd;
+
+      if (argc > 0) {
+        OptlyCommand *tmp = optly__parse_command(*argv, current_cmd->commands);
+        if (!tmp) {
+          OPTLY_LOG(ERROR, "Unknown command: %s", *argv);
+          optly__push_error(&errs, OPTLY_ERR_UNKNOWN_COMMAND, *argv);
+          OPTLY_EXIT(&errs, OPTLY_ERR_UNKNOWN_COMMAND);
+        }
+
+        target = tmp;
       }
 
-      char         *target = *argv;
-      OptlyCommand *cmd    = optly__parse_command(target, current_cmd->commands);
-
-      if (!cmd) {
-        OPTLY_LOG(ERROR, "Unknown command: %s", target);
-        optly__push_error(&errs, OPTLY_ERR_UNKNOWN_COMMAND, target);
-        OPTLY_EXIT(&errs, OPTLY_ERR_UNKNOWN_COMMAND);
-      }
-
-      optly_usage(cmd);
+      optly_usage(target);
       exit(0);
-      return errs;
     }
 #endif
 
@@ -1305,7 +1269,6 @@ OPTLYDEF OptlyErrors optly_parse_args(int argc, char *argv[], OptlyCommand *main
     if (strcmp(arg, "version") == 0) {
       fprintf(stderr, "%s: %s\n", main_cmd->name, version);
       exit(0);
-      return errs;
     }
 #endif
 
