@@ -22,7 +22,6 @@ static int g_failed  = 0;
     if (!(expr)) {                                                                                        \
       fprintf(stderr, "    " ANSI_RED("ASSERT_TRUE failed") ": %s (%s:%d)\n", #expr, __FILE__, __LINE__); \
       g_failed++;                                                                                         \
-      return;                                                                                             \
     }                                                                                                     \
   } while (0)
 
@@ -32,7 +31,6 @@ static int g_failed  = 0;
     if ((expr)) {                                                                                          \
       fprintf(stderr, "    " ANSI_RED("ASSERT_FALSE failed") ": %s (%s:%d)\n", #expr, __FILE__, __LINE__); \
       g_failed++;                                                                                          \
-      return;                                                                                              \
     }                                                                                                      \
   } while (0)
 
@@ -44,7 +42,6 @@ static int g_failed  = 0;
     if (a__ != e__) {                                                                                                              \
       fprintf(stderr, "    " ANSI_RED("ASSERT_EQ_INT failed") ": got=%lld expected=%lld (%s:%d)\n", a__, e__, __FILE__, __LINE__); \
       g_failed++;                                                                                                                  \
-      return;                                                                                                                      \
     }                                                                                                                              \
   } while (0)
 
@@ -56,7 +53,6 @@ static int g_failed  = 0;
     if ((a__ == NULL && e__ != NULL) || (a__ != NULL && e__ == NULL) || (a__ && e__ && strcmp(a__, e__) != 0)) {                                             \
       fprintf(stderr, "    " ANSI_RED("ASSERT_EQ_STR failed") ": got=%s expected=%s (%s:%d)\n", a__ ? a__ : "NULL", e__ ? e__ : "NULL", __FILE__, __LINE__); \
       g_failed++;                                                                                                                                            \
-      return;                                                                                                                                                \
     }                                                                                                                                                        \
   } while (0)
 
@@ -68,7 +64,6 @@ static int g_failed  = 0;
     if (fabs(a__ - e__) > (eps)) {                                                                                                                       \
       fprintf(stderr, "    " ANSI_RED("ASSERT_FLOAT_NEAR failed") ": got=%f expected=%f eps=%f (%s:%d)\n", a__, e__, (double)(eps), __FILE__, __LINE__); \
       g_failed++;                                                                                                                                        \
-      return;                                                                                                                                            \
     }                                                                                                                                                    \
   } while (0)
 
@@ -84,29 +79,19 @@ static int g_failed  = 0;
 
 /* ------------------------------ helpers ---------------------------------- */
 
-static bool assert_err_count_failed = true;
+#define assert_err_count(errs, expected)                                         \
+  do {                                                                           \
+    int failed = g_failed;                                                       \
+    ASSERT_EQ_INT((long long)optly_errors_count((errs)), (long long)(expected)); \
+    if (g_failed > failed) optly_error_print((errs));                            \
+  } while (0)
 
-static void do_assert_err_count(const OptlyErrors *errs, size_t expected) {
-  assert_err_count_failed = true;
-  ASSERT_EQ_INT((long long)optly_errors_count(errs), (long long)expected);
-  assert_err_count_failed = false;
-}
-
-static void assert_err_count(const OptlyErrors *errs, size_t expected) {
-  do_assert_err_count(errs, expected);
-
-  if (!assert_err_count_failed) {
-    return;
-  }
-
-  optly_error_print(errs);
-}
-
-static void assert_err_at(const OptlyErrors *errs, size_t idx, OptlyErrorKind kind, const char *arg) {
-  OptlyError e = optly_errors_at(errs, idx);
-  ASSERT_EQ_INT((int)e.kind, (int)kind);
-  if (arg) ASSERT_EQ_STR(e.arg, arg);
-}
+#define assert_err_at(errs, idx, k, aarg)           \
+  do {                                             \
+    OptlyError e = optly_errors_at((errs), (idx)); \
+    ASSERT_EQ_INT((int)e.kind, (int)(k));          \
+    if (aarg) ASSERT_EQ_STR(e.arg, (aarg));          \
+  } while (0)
 
 #define ARGV(...) {__VA_ARGS__, NULL}
 
