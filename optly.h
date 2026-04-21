@@ -490,12 +490,6 @@ inline OPTLYDEF OptlyPositional *optly_get_positional(OptlyCommand *command, con
 
 #define SHIFT_ARG(argv, argc) (++(argv), --(argc))
 
-#define UNREACHABLE(message)                                                 \
-  do {                                                                       \
-    OPTLY_LOG(FATAL, "%s:%d: UNREACHABLE: %s", __FILE__, __LINE__, message); \
-    abort();                                                                 \
-  } while (0)
-
 static const char *error_messages[] = {
   [OPTLY_OK]                      = "No error",
   [OPTLY_ERR_UNKNOWN_FLAG]        = "Unknown flag",
