@@ -923,7 +923,7 @@ static void optly__parse_batch_flags(char *arg, OptlyFlag *flags, OptlyErrors *e
 #endif
 
       OPTLY_LOG(WARN, "Unknown short flag: %s", sarg);
-      optly__push_error(errs, OPTLY_ERR_UNKNOWN_FLAG, &flag->shortname);
+      optly__push_error(errs, OPTLY_ERR_UNKNOWN_FLAG, sarg);
 
       continue;
     }
@@ -1078,12 +1078,34 @@ static void optly__push_positional(OptlyCommand *cmd, char *value) {
   }
 }
 
+
+static void optly__validate_flags(OptlyCommand *cmd, OptlyErrors *errs) {
+  for (OptlyFlag *flag = cmd->flags; !optly_is_flag_null(flag); flag++) {
+    if (flag->required && !flag->present) {
+      OPTLY_LOG(ERROR, "Required flag '--%s' is not present", flag->fullname);
+      optly__push_error(errs, OPTLY_ERR_MISSING_REQUIRED, flag->fullname);
+    }
+  }
+}
+
 static void optly__validate_positionals(OptlyCommand *cmd, OptlyErrors *errs) {
   if (!cmd->positionals) {
     return;
   }
 
+  bool infinite_found = false;
+
   for (OptlyPositional *pos = cmd->positionals; pos->name; pos++) {
+    if (pos->max == 0) {
+      if (infinite_found) {
+        OPTLY_LOG(FATAL, "Positional '%s' allows infinite values, but another variadic positional already exists", pos->name);
+        optly__push_error(errs, OPTLY_ERR_DUPLICATE_VARIADIC, pos->name);
+        OPTLY_EXIT(&errs, OPTLY_ERR_DUPLICATE_VARIADIC);
+      }
+
+      infinite_found = true;
+    }
+
     if (pos->count < pos->min) {
       OPTLY_LOG(ERROR, "Not enough values for positional '%s'", pos->name);
       optly__push_error(errs, OPTLY_ERR_POSITIONAL_TOO_FEW, pos->name);
@@ -1202,10 +1224,8 @@ OPTLYDEF OptlyErrors optly_parse_args(int argc, char *argv[], OptlyCommand *main
     main_cmd->name = argv[0];
   }
 
-  OptlyCommand *current_cmd = main_cmd;
-
-  bool positional_only            = false;
-  bool all_required_flags_present = true;
+  OptlyCommand *current_cmd     = main_cmd;
+  bool          positional_only = false;
 
   SHIFT_ARG(argv, argc);
 
@@ -1222,122 +1242,91 @@ OPTLYDEF OptlyErrors optly_parse_args(int argc, char *argv[], OptlyCommand *main
       continue;
     }
 
+    if (strcmp(arg, "--") == 0) {
+      positional_only = true;
+      SHIFT_ARG(argv, argc);
+      continue;
+    }
+
     if (arg[0] == '-') {
-      if (arg[1] == '-' && arg[2] == '\0') {
-        positional_only = true;
-      } else if (current_cmd->flags) {
+      if (current_cmd->flags) {
         optly__parse_flags(&argv, &argc, current_cmd->flags, &errs);
       } else {
+        // --flag if no flags defined is positional
         optly__push_positional(current_cmd, arg);
       }
-    } else {
-      OptlyCommand *cmd = optly__parse_command(arg, current_cmd->commands);
 
-#ifdef OPTLY_GEN_HELP_COMMAND
-      if (strcmp(arg, "help") == 0) {
-        SHIFT_ARG(argv, argc);
-
-        if (argc == 0) {
-          optly_usage(current_cmd);
-          exit(0);
-          return errs;
-        }
-
-        char         *target = *argv;
-        OptlyCommand *cmd    = optly__parse_command(target, current_cmd->commands);
-
-        if (!cmd) {
-          OPTLY_LOG(ERROR, "Unknown command: %s", target);
-          optly__push_error(&errs, OPTLY_ERR_UNKNOWN_COMMAND, target);
-          OPTLY_EXIT(&errs, OPTLY_ERR_UNKNOWN_COMMAND);
-        }
-
-        optly_usage(cmd);
+      if (optly__help_flag.present) {
+        optly_usage(current_cmd);
         exit(0);
         return errs;
       }
-#endif
 
-#ifdef OPTLY_GEN_VERSION_COMMAND
-      if (strcmp(arg, "version") == 0) {
+#ifdef OPTLY_GEN_VERSION_FLAG
+      if (optly__version_flag.present) {
         fprintf(stderr, "%s: %s\n", main_cmd->name, version);
         exit(0);
         return errs;
       }
 #endif
 
-      if (!cmd) {
-        if (current_cmd->positionals) {
-          optly__push_positional(current_cmd, arg);
-        } else {
-          OPTLY_LOG(ERROR, "Unknown command %s", arg);
-          optly__push_error(&errs, OPTLY_ERR_UNKNOWN_COMMAND, arg);
-        }
-        SHIFT_ARG(argv, argc);
-        continue;
-      }
-
-      for (OptlyFlag *flag = current_cmd->flags; !optly_is_flag_null(flag); flag++) {
-        if (flag->required && !flag->present) {
-          all_required_flags_present = false;
-          OPTLY_LOG(ERROR, "Required flag '--%s' is not present", flag->fullname);
-          optly__push_error(&errs, OPTLY_ERR_MISSING_REQUIRED, flag->fullname);
-        }
-      }
-
-      optly__validate_positionals(current_cmd, &errs);
-
-      if (errs.count > 0) {
-        all_required_flags_present = false;
-      }
-
-      bool infinite_found = false;
-
-      for (OptlyPositional *pos = current_cmd->positionals; pos && pos->name; pos++) {
-        if (pos->max == 0) {
-          if (infinite_found) {
-            OPTLY_LOG(FATAL, "Positional '%s' allows infinite values, but another variadic positional already exists", pos->name);
-            optly__push_error(&errs, OPTLY_ERR_DUPLICATE_VARIADIC, pos->name);
-            OPTLY_EXIT(&errs, OPTLY_ERR_DUPLICATE_VARIADIC);
-          }
-
-          infinite_found = true;
-        }
-      }
-
-      current_cmd->next_command = cmd;
-      current_cmd               = current_cmd->next_command;
+      SHIFT_ARG(argv, argc);
+      continue;
     }
 
-    if (optly__help_flag.present) {
-      optly_usage(current_cmd);
+    OptlyCommand *cmd = optly__parse_command(arg, current_cmd->commands);
+
+#ifdef OPTLY_GEN_HELP_COMMAND
+    if (strcmp(arg, "help") == 0) {
+      SHIFT_ARG(argv, argc);
+
+      if (argc == 0) {
+        optly_usage(current_cmd);
+        exit(0);
+        return errs;
+      }
+
+      char         *target = *argv;
+      OptlyCommand *cmd    = optly__parse_command(target, current_cmd->commands);
+
+      if (!cmd) {
+        OPTLY_LOG(ERROR, "Unknown command: %s", target);
+        optly__push_error(&errs, OPTLY_ERR_UNKNOWN_COMMAND, target);
+        OPTLY_EXIT(&errs, OPTLY_ERR_UNKNOWN_COMMAND);
+      }
+
+      optly_usage(cmd);
       exit(0);
       return errs;
     }
+#endif
 
-    #ifdef OPTLY_GEN_VERSION_FLAG
-    if (optly__version_flag.present) {
+#ifdef OPTLY_GEN_VERSION_COMMAND
+    if (strcmp(arg, "version") == 0) {
       fprintf(stderr, "%s: %s\n", main_cmd->name, version);
       exit(0);
       return errs;
     }
-    #endif
+#endif
+
+    if (cmd) {
+      current_cmd->next_command = cmd;
+      current_cmd               = current_cmd->next_command;
+    } else {
+      if (current_cmd->positionals) {
+        optly__push_positional(current_cmd, arg);
+      } else {
+        OPTLY_LOG(ERROR, "Unknown command %s", arg);
+        optly__push_error(&errs, OPTLY_ERR_UNKNOWN_COMMAND, arg);
+      }
+    }
 
     SHIFT_ARG(argv, argc);
   }
 
-  for (OptlyFlag *flag = current_cmd->flags; !optly_is_flag_null(flag); flag++) {
-    if (flag->required && !flag->present) {
-      all_required_flags_present = false;
-      OPTLY_LOG(ERROR, "Required flag '--%s' is not present", flag->fullname);
-      optly__push_error(&errs, OPTLY_ERR_MISSING_REQUIRED, flag->fullname);
-    }
-  }
-
-  optly__validate_positionals(current_cmd, &errs);
-
-  if (!all_required_flags_present) {
-    OPTLY_EXIT(&errs, OPTLY_ERR_MISSING_REQUIRED);
+  for (OptlyCommand *cmd = main_cmd; cmd; cmd = cmd->next_command) {
+    optly__validate_flags(cmd, &errs);
+    optly__validate_positionals(cmd, &errs);
   }
 
   current_cmd->next_command = NULL;
@@ -1347,6 +1336,7 @@ OPTLYDEF OptlyErrors optly_parse_args(int argc, char *argv[], OptlyCommand *main
     exit(EXIT_FAILURE);
   }
 #endif
+
   return errs;
 }
 
