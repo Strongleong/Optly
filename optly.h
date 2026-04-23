@@ -25,6 +25,9 @@
     #include "optly.h"
 
     // You need to define "main" command, which is your application.
+    // Note: If you compile with `gcc` with flag `-pedantic` this will fire warning.
+    //       To suppress it have static variables for flags, commands and enum flag values separately,
+    //       or move cmd to runtime (to `main` function)
     static OptlyCommand cmd = {
 
       // Name will be used in usage. If you set is as NULL it will be argv[0]
@@ -374,12 +377,13 @@ OPTLYDEF void        optly_error_print(const OptlyErrors *errs);
 #define NULL_COMMAND    {.name = NULL, .flags = NULL}
 #define NULL_POSITIONAL {.name = NULL}
 
-// NOTE: Forcing designated initializer to automatically zero initialize missing fields
+// NOTE: Forcing designated initializer for automatically zero-initializing missing fields
 #define optly_flag(name, ...)        \
   (OptlyFlag) {                      \
     .fullname = (name), __VA_ARGS__, \
     .present  = false                \
   }
+
 #define optly_command(namme, ...) \
   (OptlyCommand) {                \
     .name = (namme), __VA_ARGS__  \
@@ -502,8 +506,6 @@ static const char *error_messages[] = {
   [OPTLY_ERR_DUPLICATE_VARIADIC]  = "Duplicate variadic positional",
   [OPTLY_ERR_BATCH_NON_BOOL]      = "Cannot batch non-boolean flags",
 };
-
-static const char *flag_enum[] = {0};
 
 OPTLYDEF const char *optly_error_message(OptlyErrorKind err) {
 #if __STDC_VERSION__ >= 201112L  // Check for C11 support
@@ -698,7 +700,7 @@ static void optly__usage_flags(OptlyFlag *flags) {
   size_t pad = optly__flag_print_width(flags);
 
   for (OptlyFlag *flag = flags; !optly_is_flag_null(flag); flag++) {
-    char buf[OPTLY_FLAG_BUFFER_LENGTH];
+    char buf[OPTLY_FLAG_BUFFER_LENGTH + 16];
 
     // const char *type = optly__flag_type_name(flag->type);
     char type_buf[OPTLY_FLAG_BUFFER_LENGTH];

@@ -9,91 +9,6 @@
 #define OPTLY_IMPLEMENTATION
 #include <optly.h>
 
-static OptlyCommand cmd = optly_command(
-  "full.c",
-  "Full example of optly usage",
-
-  optly_flags(
-    optly_flag_bool("verbose", 'b', "Enable verbose logging"),
-    optly_flag_string("config", 'c', "Config file path", .value.as_string = "./config"),
-    optly_flag_string("env", 'e', "Environment (dev, staging, prod)", .value.as_string = "dev"),
-    optly_flag_bool("json", 'j', "Output JSON")
-  ),
-
-  optly_commands(
-    optly_command(
-      "build",
-      "Build container images",
-      optly_flags(
-        optly_flag_string("tags", 't', "Image tag", .required = true),
-        optly_flag_string("file", 'f', "Dockerfile path"),
-        // NOTE: Here we skipped shortname. -n would not work but --no-cache will
-        optly_flag_bool("no-cache", .description = "Disable build cache")
-      ),
-      .positionals = optly_positionals(
-        optly_positional("context", "Build context directory", 1, 1)
-      )
-    ),
-
-    optly_command(
-      "deploy",
-      "Deploy servie",
-      optly_flags(
-        optly_flag_uint32("replicas", 'r', "Number of replicas"),
-        optly_flag_bool("wait", 'w', "Wait for deployment finishes")
-      ),
-      optly_commands(
-        optly_command("status", "Get status of deployed service"),
-        optly_command(
-          "rollback",
-          "Rollback service",
-          // NOTE: Flags for subcommand of command
-          optly_flags(
-            optly_flag_uint32("revision", 'r', "Revision to rollabck to")
-          )
-        )
-      ),
-      optly_positionals(
-        optly_positional("service", "Service name", 1, 1)
-      )
-    ),
-
-    optly_command(
-      "logs",
-      "View service logs",
-      optly_flags(
-        optly_flag_bool("follow", 'f', "Follow log output"),
-        optly_flag_uint32("lines", 'n', "Number of lines ", .value.as_uint32 = 20),
-        optly_flag_uint32("since", 's', "Show logs scinse timestamp")
-      ),
-      .positionals = optly_positionals(
-        // NOTE: min = 0 means if no service provided, then pull from all.
-        //       max = 0 menas get as much as possible (like in cp command: cp file1 file2 ... fileN dst)
-        optly_positional("services", "Services to pull logs from", 0, 0)
-      )
-    ),
-
-    optly_command(
-      "service",
-      "Manage services",
-      // NOTE: Here we don't have any flags so we skip then to subcommands
-      .commands = optly_commands(
-        optly_command(
-          "start",
-          .flags = optly_flags(
-            optly_flag_uint32("scale", 's', "Start N instances", .value.as_uint32 = 1)
-          )
-        ),
-        optly_command("stop", NULL),
-        optly_command("restart", NULL)
-      ),
-      .positionals = optly_positionals(
-        optly_positional("service", "Service name", 0, 1)
-      )
-    )
-  )
-);
-
 void build(OptlyCommand *cmd) {
   printf("Build command flags:\n");
   printf("tags     = %s\n", optly_flag_value_string(cmd, "tags"));
@@ -194,6 +109,91 @@ void services(OptlyCommand *cmd) {
 }
 
 int main(int argc, char *argv[]) {
+  OptlyCommand cmd = optly_command(
+    "full.c",
+    "Full example of optly usage",
+
+    optly_flags(
+      optly_flag_bool("verbose", 'b', "Enable verbose logging"),
+      optly_flag_string("config", 'c', "Config file path", .value.as_string = "./config"),
+      optly_flag_string("env", 'e', "Environment (dev, staging, prod)", .value.as_string = "dev"),
+      optly_flag_bool("json", 'j', "Output JSON")
+    ),
+
+    optly_commands(
+      optly_command(
+        "build",
+        "Build container images",
+        optly_flags(
+          optly_flag_string("tags", 't', "Image tag", .required = true),
+          optly_flag_string("file", 'f', "Dockerfile path"),
+          // NOTE: Here we skipped shortname. -n would not work but --no-cache will
+          optly_flag_bool("no-cache", .description = "Disable build cache")
+        ),
+        .positionals = optly_positionals(
+          optly_positional("context", "Build context directory", 1, 1)
+        )
+      ),
+
+      optly_command(
+        "deploy",
+        "Deploy servie",
+        optly_flags(
+          optly_flag_uint32("replicas", 'r', "Number of replicas"),
+          optly_flag_bool("wait", 'w', "Wait for deployment finishes")
+        ),
+        optly_commands(
+          optly_command("status", "Get status of deployed service"),
+          optly_command(
+            "rollback",
+            "Rollback service",
+            // NOTE: Flags for subcommand of command
+            optly_flags(
+              optly_flag_uint32("revision", 'r', "Revision to rollabck to")
+            )
+          )
+        ),
+        optly_positionals(
+          optly_positional("service", "Service name", 1, 1)
+        )
+      ),
+
+      optly_command(
+        "logs",
+        "View service logs",
+        optly_flags(
+          optly_flag_bool("follow", 'f', "Follow log output"),
+          optly_flag_uint32("lines", 'n', "Number of lines ", .value.as_uint32 = 20),
+          optly_flag_uint32("since", 's', "Show logs scinse timestamp")
+        ),
+        .positionals = optly_positionals(
+          // NOTE: min = 0 means if no service provided, then pull from all.
+          //       max = 0 menas get as much as possible (like in cp command: cp file1 file2 ... fileN dst)
+          optly_positional("services", "Services to pull logs from", 0, 0)
+        )
+      ),
+
+      optly_command(
+        "service",
+        "Manage services",
+        // NOTE: Here we don't have any flags so we skip then to subcommands
+        .commands = optly_commands(
+          optly_command(
+            "start",
+            .flags = optly_flags(
+              optly_flag_uint32("scale", 's', "Start N instances", .value.as_uint32 = 1)
+            )
+          ),
+          optly_command("stop", NULL),
+          optly_command("restart", NULL)
+        ),
+        .positionals = optly_positionals(
+          optly_positional("service", "Service name", 0, 1)
+        )
+      )
+    )
+  );
+
   optly_parse_args(argc, argv, &cmd, "v1.0.0");
 
   printf("Global flags:\n");
