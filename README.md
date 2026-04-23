@@ -49,25 +49,25 @@ In other files:
 #include "optly.h"
 #include <stdio.h>
 
-static OptlyCommand cmd = {
-  .name = "app",
-
-  .flags = optly_flags(
-    optly_flag_bool("verbose", 'v', "Enable verbose output", .value.as_bool = false),
-    optly_flag_uint32("threads", 't', "Worker threads", .value.as_uint32 = 4)
-  ),
-
-  .commands = optly_commands(
-    optly_command("run", "Run server",
-      .flags = optly_flags(
-        optly_flag_uint16("port", 'p', "Server port", .value.as_uint16 = 8080)
-      )
-    )
-  )
-};
-
 int main(int argc, char **argv)
 {
+  OptlyCommand cmd = {
+    .name = "app",
+
+    .flags = optly_flags(
+      optly_flag_bool("verbose", 'v', "Enable verbose output", .value.as_bool = false),
+      optly_flag_uint32("threads", 't', "Worker threads", .value.as_uint32 = 4)
+    ),
+
+    .commands = optly_commands(
+      optly_command("run", "Run server",
+        .flags = optly_flags(
+          optly_flag_uint16("port", 'p', "Server port", .value.as_uint16 = 8080)
+        )
+      )
+    )
+  };
+
   optly_parse_args(argc, argv, &cmd);
 
   printf("threads: %u\n", optly_uint32(&cmd, "threads"));

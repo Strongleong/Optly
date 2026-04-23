@@ -92,11 +92,9 @@ for example in $examples; do
   fi
 
   if $COMPILE; then
-    $CMD &
+    $CMD
   fi
 done
-
-wait
 
 if $VERBOSE; then
   set -x

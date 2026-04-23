@@ -4,22 +4,22 @@
 #define OPTLY_IMPLEMENTATION
 #include "optly.h"
 
-static OptlyCommand cmd = {
-  .name        = NULL,
-  .description = NULL,
-
-  .flags = optly_flags(
-    // First value in array is default value, the rest of them are possible values.
-    // You need to manually cast to (char *[]) beaause it is C :(
-    // Also don't forget to close the values array with NULL
-    optly_flag_enum("level", 'l', .value.as_enum = (char *[]){"info", "verb", "info", "warn", NULL}),
-
-    // You can ues `optly_enum_values` to not manually cast into char*[] and apeend NULL to the end
-    optly_flag_enum("enum", 'e', optly_enum_values(NULL, "a", "b", "c"), .required = true)
-  ),
-};
-
 int main(int argc, char **argv) {
+  OptlyCommand cmd = {
+    .name        = NULL,
+    .description = NULL,
+
+    .flags = optly_flags(
+      // First value in array is default value, the rest of them are possible values.
+      // You need to manually cast to (char *[]) beaause it is C :(
+      // Also don't forget to close the values array with NULL
+      optly_flag_enum("level", 'l', .value.as_enum = (char *[]){"info", "verb", "info", "warn", NULL}),
+
+      // You can use `optly_enum_values` to not manually cast into char*[] and apeend NULL to the end
+      optly_flag_enum("enum", 'e', optly_enum_values(NULL, "a", "b", "c"), .required = true)
+    ),
+  };
+
   optly_parse_args(argc, argv, &cmd);
 
   // You can get the value with handy accessor function, as always
