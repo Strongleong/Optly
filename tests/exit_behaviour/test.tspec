@@ -1,0 +1,33 @@
+:test bad_flag_exits_nonzero_by_default
+:command compile
+:blob executable 2
+cc
+:blob args 97
+-std=c99 -Wall -Wextra -Werror -pedantic -I../.. exit_behaviour.c -o .side_effects/exit_behaviour
+:int return 0
+:command run
+:blob executable 28
+.side_effects/exit_behaviour
+:blob args 6
+--nope
+:int return 1
+:blob stdout 0
+
+:blob stderr_contains 12
+Unknown flag
+:test valid_arguments_return_to_the_caller
+:command compile
+:blob executable 2
+cc
+:blob args 97
+-std=c99 -Wall -Wextra -Werror -pedantic -I../.. exit_behaviour.c -o .side_effects/exit_behaviour
+:int return 0
+:command run
+:blob executable 28
+.side_effects/exit_behaviour
+:blob args 4
+-t 8
+:int return 0
+:blob stdout 9
+survived
+

@@ -1,0 +1,142 @@
+:test unknown_flag_is_reported
+:command compile
+:blob executable 2
+cc
+:blob args 81
+-std=c99 -Wall -Wextra -Werror -pedantic -I../.. errors.c -o .side_effects/errors
+:int return 0
+:command run
+:blob executable 20
+.side_effects/errors
+:blob args 17
+-T x a.txt --nope
+:int return 0
+:blob stdout 34
+errors=1
+0: Unknown flag (--nope)
+
+:test a_flag_without_its_value_is_reported
+:command compile
+:blob executable 2
+cc
+:blob args 81
+-std=c99 -Wall -Wextra -Werror -pedantic -I../.. errors.c -o .side_effects/errors
+:int return 0
+:command run
+:blob executable 20
+.side_effects/errors
+:blob args 20
+-T x a.txt --threads
+:int return 0
+:blob stdout 44
+errors=1
+0: Flag requires a value (threads)
+
+:test a_value_that_is_not_a_number_is_reported
+:command compile
+:blob executable 2
+cc
+:blob args 81
+-std=c99 -Wall -Wextra -Werror -pedantic -I../.. errors.c -o .side_effects/errors
+:int return 0
+:command run
+:blob executable 20
+.side_effects/errors
+:blob args 24
+-T x a.txt --threads=abc
+:int return 0
+:blob stdout 41
+errors=1
+0: Invalid value for flag (abc)
+
+:test a_missing_required_flag_is_reported
+:command compile
+:blob executable 2
+cc
+:blob args 81
+-std=c99 -Wall -Wextra -Werror -pedantic -I../.. errors.c -o .side_effects/errors
+:int return 0
+:command run
+:blob executable 20
+.side_effects/errors
+:blob args 5
+a.txt
+:int return 0
+:blob stdout 49
+errors=1
+0: Required flag is not present (token)
+
+:test batching_a_non_bool_flag_is_reported
+:command compile
+:blob executable 2
+cc
+:blob args 81
+-std=c99 -Wall -Wextra -Werror -pedantic -I../.. errors.c -o .side_effects/errors
+:int return 0
+:command run
+:blob executable 20
+.side_effects/errors
+:blob args 3
+-tT
+:int return 0
+:blob stdout 168
+errors=4
+0: Cannot batch non-boolean flags (t)
+1: Cannot batch non-boolean flags (T)
+2: Required flag is not present (token)
+3: Not enough positional arguments (files)
+
+:test too_few_positionals_are_reported
+:command compile
+:blob executable 2
+cc
+:blob args 81
+-std=c99 -Wall -Wextra -Werror -pedantic -I../.. errors.c -o .side_effects/errors
+:int return 0
+:command run
+:blob executable 20
+.side_effects/errors
+:blob args 4
+-T x
+:int return 0
+:blob stdout 52
+errors=1
+0: Not enough positional arguments (files)
+
+:test too_many_positionals_are_reported
+:command compile
+:blob executable 2
+cc
+:blob args 81
+-std=c99 -Wall -Wextra -Werror -pedantic -I../.. errors.c -o .side_effects/errors
+:int return 0
+:command run
+:blob executable 20
+.side_effects/errors
+:blob args 22
+-T x a.txt b.txt c.txt
+:int return 0
+:blob stdout 50
+errors=1
+0: Too many positional arguments (files)
+
+:test every_error_is_collected_not_just_the_first
+:command compile
+:blob executable 2
+cc
+:blob args 81
+-std=c99 -Wall -Wextra -Werror -pedantic -I../.. errors.c -o .side_effects/errors
+:int return 0
+:command run
+:blob executable 20
+.side_effects/errors
+:blob args 20
+--nope --threads=abc
+:int return 0
+:blob stdout 149
+errors=4
+0: Unknown flag (--nope)
+1: Invalid value for flag (abc)
+2: Required flag is not present (token)
+3: Not enough positional arguments (files)
+

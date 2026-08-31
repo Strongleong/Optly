@@ -1,0 +1,34 @@
+:test a_flag_name_longer_than_the_buffer_does_not_crash
+:command compile
+:blob executable 2
+cc
+:blob args 89
+-std=c99 -Wall -Wextra -Werror -pedantic -I../.. long_flags.c -o .side_effects/long_flags
+:int return 0
+:command run
+:blob executable 24
+.side_effects/long_flags
+:blob args 304
+--aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa=x
+:int return 0
+:blob stdout 19
+errors=1
+out=a.out
+
+:test a_normal_inline_value_still_works
+:command compile
+:blob executable 2
+cc
+:blob args 89
+-std=c99 -Wall -Wextra -Werror -pedantic -I../.. long_flags.c -o .side_effects/long_flags
+:int return 0
+:command run
+:blob executable 24
+.side_effects/long_flags
+:blob args 13
+--out=bin/app
+:int return 0
+:blob stdout 21
+errors=0
+out=bin/app
+

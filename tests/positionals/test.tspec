@@ -1,0 +1,78 @@
+:test values_are_collected_in_order
+:command compile
+:blob executable 2
+cc
+:blob args 91
+-std=c99 -Wall -Wextra -Werror -pedantic -I../.. positionals.c -o .side_effects/positionals
+:int return 0
+:command run
+:blob executable 25
+.side_effects/positionals
+:blob args 17
+a.txt b.txt c.txt
+:int return 0
+:blob stdout 63
+verbose=0
+count=3
+files[0]=a.txt
+files[1]=b.txt
+files[2]=c.txt
+
+:test flags_may_be_interleaved_with_values
+:command compile
+:blob executable 2
+cc
+:blob args 91
+-std=c99 -Wall -Wextra -Werror -pedantic -I../.. positionals.c -o .side_effects/positionals
+:int return 0
+:command run
+:blob executable 25
+.side_effects/positionals
+:blob args 21
+a.txt --verbose b.txt
+:int return 0
+:blob stdout 48
+verbose=1
+count=2
+files[0]=a.txt
+files[1]=b.txt
+
+:test everything_after_a_double_dash_is_positional
+:command compile
+:blob executable 2
+cc
+:blob args 91
+-std=c99 -Wall -Wextra -Werror -pedantic -I../.. positionals.c -o .side_effects/positionals
+:int return 0
+:command run
+:blob executable 25
+.side_effects/positionals
+:blob args 27
+-- --not-a-flag a.txt b.txt
+:int return 0
+:blob stdout 70
+verbose=0
+count=3
+files[0]=--not-a-flag
+files[1]=a.txt
+files[2]=b.txt
+
+:test a_double_dash_after_a_value_still_ends_flag_parsing
+:command compile
+:blob executable 2
+cc
+:blob args 91
+-std=c99 -Wall -Wextra -Werror -pedantic -I../.. positionals.c -o .side_effects/positionals
+:int return 0
+:command run
+:blob executable 25
+.side_effects/positionals
+:blob args 11
+a.txt -- -v
+:int return 0
+:blob stdout 45
+verbose=0
+count=2
+files[0]=a.txt
+files[1]=-v
+
