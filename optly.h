@@ -156,7 +156,7 @@
 
   Named positional: (can have many valies inside)
 
-    Positional *pos = optly_get_positional(&cmd, "name");
+    OptlyPositional *pos = optly_get_positional(&cmd, "name");
 
   Or directly through command:
 
