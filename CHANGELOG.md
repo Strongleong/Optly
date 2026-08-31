@@ -2,6 +2,8 @@
 
 ## Upcoming
 
+## v2.3.6
+
 ### Fixed
 
 - Optly no longer includes `<strings.h>`. It is POSIX-only and MSVC does not
