@@ -466,7 +466,6 @@ OPTLYDEF OptlyPositional *optly_get_positional(OptlyCommand *command, const char
 
 // -----------------------------------
 
-#define OPTLY_IMPLEMENTATION
 #ifdef OPTLY_IMPLEMENTATION
 
 #include <assert.h>
