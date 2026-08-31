@@ -766,11 +766,11 @@ static void optly_usage_flags(OptlyFlag *flags) {
   }
 
 #ifdef OPTLY_GEN_HELP_FLAG
-  fprintf(stderr, "\n  %-*s  Show this message\n", (int)pad + type_name_pad, "-h --help");
+  fprintf(stderr, "\n  %-*s  Show this message\n", (int)pad + type_name_pad, OPTLY_HELP_SHORT_FLAG " --help");
 #endif
 
 #ifdef OPTLY_GEN_VERSION_FLAG
-  fprintf(stderr, "  %-*s  Show version\n", (int)pad + type_name_pad, "-v --version");
+  fprintf(stderr, "  %-*s  Show version\n", (int)pad + type_name_pad, OPTLY_VERSION_SHORT_FLAG " --version");
 #endif
 }
 
