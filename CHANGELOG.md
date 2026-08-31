@@ -2,6 +2,14 @@
 
 ## Upcoming
 
+## Added
+
+- Added tests, using tspec tests format and strum runner.
+
+## Fixed
+
+- Fixed crash when argument length is not truncated correctly.
+
 ## v2.3.6
 
 ### Fixed
