@@ -606,7 +606,7 @@ static void optly_usage_signature(OptlyCommand *cmd) {
   fprintf(stderr, "\n");
 }
 
-static uint8_t type_name_pad = 8;
+static const uint8_t type_name_pad = 8;
 
 static const char *optly_flag_type_name(OptlyFlagType type) {
   switch (type) {
