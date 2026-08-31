@@ -18,6 +18,7 @@
 
 ### Changed
 
+- Readme is updated, fixed a lot of typos.
 
 ### Known issues
 
