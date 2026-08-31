@@ -70,11 +70,11 @@ int main(int argc, char **argv)
 
   optly_parse_args(argc, argv, &cmd);
 
-  printf("threads: %u\n", optly_uint32(&cmd, "threads"));
+  printf("threads: %u\n", optly_flag_value_uint32(&cmd, "threads"));
 
   if (cmd.next_command) {
     printf("command: %s\n", cmd.next_command->name);
-    printf("port: %u\n", optly_uint16(cmd.next_command, "port"));
+    printf("port: %u\n", optly_flag_value_uint16(cmd.next_command, "port"));
   }
 }
 ```
@@ -87,23 +87,38 @@ Run:
 
 ## Error handling
 
-This library reports its errors by itself, no complicated error handling required.
+`optly_parse_args()` collects every problem it finds instead of stopping at the
+first one, and returns them:
 
-By default reporting is disabled, but Optly provides [logcie](https://github.com/Strongleong/logcie/tree/custom-format?tab=readme-ov-file#usage-in-libraries) interface.
+``` c
+OptlyErrors errs = optly_parse_args(argc, argv, &cmd);
 
-Just put logcie somewhre next to optly in your project, or define logging macros
-
-```c
-#define OPTLY_LOG_BACKEND(level, ...) fprintf(stderr, ##level ": " __VA_ARGS__);
+for (size_t i = 0; i < optly_errors_count(&errs); i++) {
+  OptlyError e = optly_errors_at(&errs, i);
+  printf("%s%s%s\n", optly_error_message(e.kind), e.arg ? ": " : "", e.arg ? e.arg : "");
+}
 ```
 
-You can disable or enable certan logging levels in compiile time:
+`optly_error_print(&errs)` does the same thing if the default wording is fine.
 
-```c
-#define OPTLY_LOG_DEBUG // define to nothing
+**By default optly calls `exit()` when parsing fails.** A CLI parser runs once,
+at startup, and bad arguments mean the program should not continue. To take
+that decision yourself -- in tests, or when you want to print your own message
+-- define:
+
+``` c
+#define OPTLY_NO_EXIT
 ```
 
-To control logging in runtime check out [logcie](https://github.com/strongleong/logcie).
+Optly also logs each error as it happens. Out of the box that goes to `stderr`
+via `fprintf`. If [logcie](https://github.com/Strongleong/logcie) is included
+before optly, its module logging is used instead, so your application decides
+where optly's output goes. To route it somewhere else entirely, define
+`OPTLY_LOG` before including optly:
+
+``` c
+#define OPTLY_LOG(level, ...) my_logger(#level, __VA_ARGS__)
+```
 
 ## Flags
 
@@ -139,30 +154,38 @@ Each command may define its own:
 -   subcommands
 -   positional arguments
 
-# Positional Arguments
+## Positional Arguments
 
-Example:
+Declare them on the command that accepts them:
+
+``` c
+.positionals = optly_positionals(
+  optly_positional("files", "Files to build", .min = 1, .max = 0)
+)
+```
+
+`min` is how many are required, `max` how many are allowed; `max = 0` means any
+number. Everything after a bare `--` is treated as positional, even if it looks
+like a flag:
 
     app build file1 file2
+    app build -- --not-a-flag
 
 Access them via:
 
 ``` c
-OptlyPositional *p = optly_get_positional(cmd, "files");
+OptlyPositional *p = optly_get_positional(&cmd, "files");
+
+for (size_t i = 0; i < p->count; i++) {
+  printf("%s\n", p->values[i]);
+}
 ```
 
 ## Usage Helpers
 
-Print global usage:
-
 ``` c
-optly_usage(argv[0], cmd.commands, cmd.flags);
-```
-
-Print command usage:
-
-``` c
-optly_command_usage(argv[0], command);
+optly_usage(&cmd);                 // usage for the whole program
+optly_usage(cmd.next_command);     // usage for the selected command
 ```
 
 
@@ -188,6 +211,35 @@ If help/version command/flag would be found during parsing usage would be
 automatically called and `exit(0)` is called.
 
 Note that user defined flags with `-h`/`-v` would interfere with generated flags.
+Their short forms can be moved with `OPTLY_HELP_SHORT_FLAG` and
+`OPTLY_VERSION_SHORT_FLAG`.
+
+`OPTLY_GEN_VERSION_FLAG` and `OPTLY_GEN_VERSION_COMMAND` add a fourth parameter
+to `optly_parse_args()`, the version string:
+
+``` c
+optly_parse_args(argc, argv, &cmd, "1.0.0");
+```
+
+## Configuration
+
+Define these before including optly:
+
+| Macro                      | Default             | Effect                                           |
+| -----                      | -------             | ------                                           |
+| `OPTLY_NO_EXIT`            | off                 | Never call `exit()`; return the errors instead   |
+| `OPTLY_MAX_POSITIONALS`    | 64                  | Values one positional can hold                   |
+| `OPTLY_MAX_ERRORS`         | 32                  | Errors collected before further ones are dropped |
+| `OPTLY_FLAG_BUFFER_LENGTH` | 256                 | Buffer used while formatting help output         |
+| `OPTLY_LOG`                | `fprintf` to stderr | Where optly's own messages go                    |
+| `OPTLY_HELP_SHORT_FLAG`    | `"-h"`              | Short flag for generated help                    |
+| `OPTLY_VERSION_SHORT_FLAG` | `"-v"`              | Short flag for generated version                 |
+| `OPTLYDEF`                 | empty               | Linkage of the public functions                  |
+
+## C only
+
+Optly is a C library. It is not tested as C++ and does not try to compile as
+C++ -- use argparse, CLI11 or cxxopts there.
 
 ## Design Goals
 
