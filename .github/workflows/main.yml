@@ -8,7 +8,8 @@ on:
     paths:
       - '**.c'
       - '**.h'
-      - 'build.sh'
+      - '**.tspec'
+      - '.github/workflows/main.yml'
   workflow_dispatch:
 
 jobs:
@@ -16,5 +17,20 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-        - uses: actions/checkout@v4
-        - run: ./build.sh && ./out/tests
+      - uses: actions/checkout@v4
+
+      - name: Build strum
+        run: |
+          git clone --depth 1 https://github.com/Strongleong/Strum strum
+          cd strum
+          cc build.c -o build
+          ./build -c gcc
+          echo "$PWD/out" >> "$GITHUB_PATH"
+
+      - name: Build
+        run: |
+          cc build.c -o build
+          ./build
+
+      - name: Test
+        run: ./build tests

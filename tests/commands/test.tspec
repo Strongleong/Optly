@@ -1,0 +1,110 @@
+:test no_command_leaves_next_command_null
+:command compile
+:blob executable 2
+cc
+:blob args 85
+-std=c99 -Wall -Wextra -Werror -pedantic -I../.. commands.c -o .side_effects/commands
+:int return 0
+:command run
+:blob executable 22
+.side_effects/commands
+:int return 0
+:blob stdout 32
+global.verbose=0
+command=<none>
+
+:test a_command_is_selected_by_name
+:command compile
+:blob executable 2
+cc
+:blob args 85
+-std=c99 -Wall -Wextra -Werror -pedantic -I../.. commands.c -o .side_effects/commands
+:int return 0
+:command run
+:blob executable 22
+.side_effects/commands
+:blob args 5
+build
+:int return 0
+:blob stdout 31
+global.verbose=0
+command=build
+
+:test command_flags_follow_the_command
+:command compile
+:blob executable 2
+cc
+:blob args 85
+-std=c99 -Wall -Wextra -Werror -pedantic -I../.. commands.c -o .side_effects/commands
+:int return 0
+:command run
+:blob executable 22
+.side_effects/commands
+:blob args 11
+run -p 9000
+:int return 0
+:blob stdout 57
+global.verbose=0
+command=run
+run.port=9000
+run.verbose=0
+
+:test a_global_flag_before_the_command_is_global
+:command compile
+:blob executable 2
+cc
+:blob args 85
+-std=c99 -Wall -Wextra -Werror -pedantic -I../.. commands.c -o .side_effects/commands
+:int return 0
+:command run
+:blob executable 22
+.side_effects/commands
+:blob args 13
+--verbose run
+:int return 0
+:blob stdout 57
+global.verbose=1
+command=run
+run.port=8080
+run.verbose=0
+
+:test the_same_short_flag_binds_to_the_level_it_appears_at
+:command compile
+:blob executable 2
+cc
+:blob args 85
+-std=c99 -Wall -Wextra -Werror -pedantic -I../.. commands.c -o .side_effects/commands
+:int return 0
+:command run
+:blob executable 22
+.side_effects/commands
+:blob args 9
+-v run -v
+:int return 0
+:blob stdout 57
+global.verbose=1
+command=run
+run.port=8080
+run.verbose=1
+
+:test subcommands_nest
+:command compile
+:blob executable 2
+cc
+:blob args 85
+-std=c99 -Wall -Wextra -Werror -pedantic -I../.. commands.c -o .side_effects/commands
+:int return 0
+:command run
+:blob executable 22
+.side_effects/commands
+:blob args 18
+run check --strict
+:int return 0
+:blob stdout 89
+global.verbose=0
+command=run
+run.port=8080
+run.verbose=0
+subcommand=check
+check.strict=1
+

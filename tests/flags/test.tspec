@@ -1,0 +1,138 @@
+:test defaults_are_used_when_no_flag_is_given
+:command compile
+:blob executable 2
+cc
+:blob args 79
+-std=c99 -Wall -Wextra -Werror -pedantic -I../.. flags.c -o .side_effects/flags
+:int return 0
+:command run
+:blob executable 19
+.side_effects/flags
+:int return 0
+:blob stdout 46
+verbose=0
+quiet=0
+force=0
+threads=4
+out=a.out
+
+:test long_flags_are_recognised
+:command compile
+:blob executable 2
+cc
+:blob args 79
+-std=c99 -Wall -Wextra -Werror -pedantic -I../.. flags.c -o .side_effects/flags
+:int return 0
+:command run
+:blob executable 19
+.side_effects/flags
+:blob args 21
+--verbose --threads 8
+:int return 0
+:blob stdout 46
+verbose=1
+quiet=0
+force=0
+threads=8
+out=a.out
+
+:test short_flags_are_recognised
+:command compile
+:blob executable 2
+cc
+:blob args 79
+-std=c99 -Wall -Wextra -Werror -pedantic -I../.. flags.c -o .side_effects/flags
+:int return 0
+:command run
+:blob executable 19
+.side_effects/flags
+:blob args 7
+-v -t 8
+:int return 0
+:blob stdout 46
+verbose=1
+quiet=0
+force=0
+threads=8
+out=a.out
+
+:test short_bool_flags_can_be_batched
+:command compile
+:blob executable 2
+cc
+:blob args 79
+-std=c99 -Wall -Wextra -Werror -pedantic -I../.. flags.c -o .side_effects/flags
+:int return 0
+:command run
+:blob executable 19
+.side_effects/flags
+:blob args 4
+-vqf
+:int return 0
+:blob stdout 46
+verbose=1
+quiet=1
+force=1
+threads=4
+out=a.out
+
+:test inline_long_value_with_equals
+:command compile
+:blob executable 2
+cc
+:blob args 79
+-std=c99 -Wall -Wextra -Werror -pedantic -I../.. flags.c -o .side_effects/flags
+:int return 0
+:command run
+:blob executable 19
+.side_effects/flags
+:blob args 26
+--threads=16 --out=bin/app
+:int return 0
+:blob stdout 49
+verbose=0
+quiet=0
+force=0
+threads=16
+out=bin/app
+
+:test inline_short_value_with_equals
+:command compile
+:blob executable 2
+cc
+:blob args 79
+-std=c99 -Wall -Wextra -Werror -pedantic -I../.. flags.c -o .side_effects/flags
+:int return 0
+:command run
+:blob executable 19
+.side_effects/flags
+:blob args 5
+-t=16
+:int return 0
+:blob stdout 47
+verbose=0
+quiet=0
+force=0
+threads=16
+out=a.out
+
+:test separate_short_value_with_space
+:command compile
+:blob executable 2
+cc
+:blob args 79
+-std=c99 -Wall -Wextra -Werror -pedantic -I../.. flags.c -o .side_effects/flags
+:int return 0
+:command run
+:blob executable 19
+.side_effects/flags
+:blob args 10
+-o bin/app
+:int return 0
+:blob stdout 48
+verbose=0
+quiet=0
+force=0
+threads=4
+out=bin/app
+

@@ -1,0 +1,28 @@
+:test usage_lists_flags_commands_and_positionals
+:command compile
+:blob executable 2
+cc
+:blob args 79
+-std=c99 -Wall -Wextra -Werror -pedantic -I../.. usage.c -o .side_effects/usage
+:int return 0
+:command run
+:blob executable 19
+.side_effects/usage
+:int return 0
+:blob stderr 281
+Example application
+
+Usage: app [FLAGS] [files...] <COMMAND>
+
+COMMANDS
+  run  Run server
+
+POSITIONAL ARGUMENTS
+  files  (0.. values)
+
+FLAGS
+  -v --verbose          Enable verbose output
+  -t --threads <u32>    Worker threads (default: 4)
+
+  -h --help             Show this message
+

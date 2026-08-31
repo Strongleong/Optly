@@ -1,0 +1,53 @@
+:test an_unknown_token_is_reported_as_an_unknown_command
+:command compile
+:blob executable 2
+cc
+:blob args 97
+-std=c99 -Wall -Wextra -Werror -pedantic -I../.. command_errors.c -o .side_effects/command_errors
+:int return 0
+:command run
+:blob executable 28
+.side_effects/command_errors
+:blob args 4
+nope
+:int return 0
+:blob stdout 50
+errors=1
+0: Unknown command (nope)
+command=<none>
+
+:test a_known_command_is_selected
+:command compile
+:blob executable 2
+cc
+:blob args 97
+-std=c99 -Wall -Wextra -Werror -pedantic -I../.. command_errors.c -o .side_effects/command_errors
+:int return 0
+:command run
+:blob executable 28
+.side_effects/command_errors
+:blob args 3
+run
+:int return 0
+:blob stdout 21
+errors=0
+command=run
+
+:test an_unknown_subcommand_is_reported
+:command compile
+:blob executable 2
+cc
+:blob args 97
+-std=c99 -Wall -Wextra -Werror -pedantic -I../.. command_errors.c -o .side_effects/command_errors
+:int return 0
+:command run
+:blob executable 28
+.side_effects/command_errors
+:blob args 8
+run nope
+:int return 0
+:blob stdout 47
+errors=1
+0: Unknown command (nope)
+command=run
+

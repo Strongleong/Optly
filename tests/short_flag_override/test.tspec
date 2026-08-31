@@ -1,0 +1,42 @@
+:test usage_advertises_the_overridden_short_flags
+:command compile
+:blob executable 2
+cc
+:blob args 107
+-std=c99 -Wall -Wextra -Werror -pedantic -I../.. short_flag_override.c -o .side_effects/short_flag_override
+:int return 0
+:command run
+:blob executable 33
+.side_effects/short_flag_override
+:int return 0
+:blob stderr 138
+Usage: app [FLAGS]
+
+FLAGS
+  -v --verbose          Verbose
+
+  -? --help             Show this message
+  -V --version          Show version
+
+:test the_overridden_help_short_flag_is_accepted
+:command compile
+:blob executable 2
+cc
+:blob args 107
+-std=c99 -Wall -Wextra -Werror -pedantic -I../.. short_flag_override.c -o .side_effects/short_flag_override
+:int return 0
+:command run
+:blob executable 33
+.side_effects/short_flag_override
+:blob args 2
+-?
+:int return 0
+:blob stderr 138
+Usage: app [FLAGS]
+
+FLAGS
+  -v --verbose          Verbose
+
+  -? --help             Show this message
+  -V --version          Show version
+

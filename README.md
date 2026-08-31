@@ -241,6 +241,39 @@ Define these before including optly:
 Optly is a C library. It is not tested as C++ and does not try to compile as
 C++ -- use argparse, CLI11 or cxxopts there.
 
+## Building
+
+Optly itself is a single header -- there is nothing to build to use it. The
+repository ships `build.c`, which compiles the examples and runs the tests.
+Compile it once, then use the binary:
+
+``` bash
+cc build.c -o build
+
+./build          # compile every example into ./out
+./build tests    # run the .tspec suite
+./build clean    # empty the output directory
+```
+
+Run `./build help` for more info.
+
+## Tests
+
+Tests live in `./tests/`, one directory per concept. Each holds a small C
+fixture and a `test.tspec` that compiles it, runs it, and compares the exact
+bytes it writes.
+
+They are written in the .tspec format and run with strum:
+
+``` bash
+./build tests
+```
+
+strum has to be on your `PATH`. Use `--tspec-runner` to point at a different
+implementation of the format.
+
+Read more about tspec and strum at [https://github.com/strongleong/strum](https://github.com/strongleong/strum)
+
 ## Design Goals
 
 Optly focuses on:

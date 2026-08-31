@@ -1,0 +1,107 @@
+:test the_default_is_used_when_the_flag_is_absent
+:command compile
+:blob executable 2
+cc
+:blob args 79
+-std=c99 -Wall -Wextra -Werror -pedantic -I../.. enums.c -o .side_effects/enums
+:int return 0
+:command run
+:blob executable 19
+.side_effects/enums
+:int return 0
+:blob stdout 29
+errors=0
+log=verbose
+force=0
+
+:test an_allowed_value_is_accepted
+:command compile
+:blob executable 2
+cc
+:blob args 79
+-std=c99 -Wall -Wextra -Werror -pedantic -I../.. enums.c -o .side_effects/enums
+:int return 0
+:command run
+:blob executable 19
+.side_effects/enums
+:blob args 10
+--log=warn
+:int return 0
+:blob stdout 26
+errors=0
+log=warn
+force=0
+
+:test the_short_form_accepts_a_value
+:command compile
+:blob executable 2
+cc
+:blob args 79
+-std=c99 -Wall -Wextra -Werror -pedantic -I../.. enums.c -o .side_effects/enums
+:int return 0
+:command run
+:blob executable 19
+.side_effects/enums
+:blob args 8
+-l debug
+:int return 0
+:blob stdout 27
+errors=0
+log=debug
+force=0
+
+:test a_value_outside_the_set_is_rejected
+:command compile
+:blob executable 2
+cc
+:blob args 79
+-std=c99 -Wall -Wextra -Werror -pedantic -I../.. enums.c -o .side_effects/enums
+:int return 0
+:command run
+:blob executable 19
+.side_effects/enums
+:blob args 10
+--log=nope
+:int return 0
+:blob stdout 62
+errors=1
+0: Invalid value for flag (nope)
+log=verbose
+force=0
+
+:test the_last_value_wins
+:command compile
+:blob executable 2
+cc
+:blob args 79
+-std=c99 -Wall -Wextra -Werror -pedantic -I../.. enums.c -o .side_effects/enums
+:int return 0
+:command run
+:blob executable 19
+.side_effects/enums
+:blob args 22
+--log=debug --log=warn
+:int return 0
+:blob stdout 26
+errors=0
+log=warn
+force=0
+
+:test an_enum_flag_mixes_with_other_flags
+:command compile
+:blob executable 2
+cc
+:blob args 79
+-std=c99 -Wall -Wextra -Werror -pedantic -I../.. enums.c -o .side_effects/enums
+:int return 0
+:command run
+:blob executable 19
+.side_effects/enums
+:blob args 13
+-f --log=warn
+:int return 0
+:blob stdout 26
+errors=0
+log=warn
+force=1
+
