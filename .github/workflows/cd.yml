@@ -1,0 +1,91 @@
+name: CD
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # A tag that fails its own tests should not become a release.
+      - name: Build strum
+        run: |
+          git clone --depth 1 https://github.com/Strongleong/Strum strum
+          cd strum
+          cc build.c -o build
+          ./build -c gcc
+          echo "$PWD/out" >> "$GITHUB_PATH"
+
+      - name: Build and test
+        run: |
+          cc build.c -o build
+          ./build
+          ./build tests
+
+      # The tag and the version macros have to agree, or people who check
+      # OPTLY_VERSION_NUMBER at compile time get a different answer from people
+      # who read the release page.
+      - name: Check the version matches the tag
+        run: |
+          major=$(sed -n 's/^#define OPTLY_VERSION_MAJOR  *//p' optly.h | tr -d ' ')
+          minor=$(sed -n 's/^#define OPTLY_VERSION_MINOR  *//p' optly.h | tr -d ' ')
+          patch=$(sed -n 's/^#define OPTLY_VERSION_RELEASE  *//p' optly.h | tr -d ' ')
+          header="v${major}.${minor}.${patch}"
+          tag="${GITHUB_REF_NAME}"
+
+          echo "header says $header, tag says $tag"
+
+          if [ "$header" != "$tag" ]; then
+            echo "::error::optly.h is $header but the tag is $tag"
+            exit 1
+          fi
+
+      # The version also appears in the banner comment at the top of the file,
+      # which is what people actually read when they open a vendored copy.
+      - name: Check the banner matches the tag
+        run: |
+          banner=$(sed -n 's/^  optly\.h — v//p' optly.h | head -1 | tr -d ' ')
+          tag="${GITHUB_REF_NAME#v}"
+
+          echo "banner says $banner, tag says $tag"
+
+          if [ "$banner" != "$tag" ]; then
+            echo "::error::the banner in optly.h says v$banner but the tag is v$tag"
+            exit 1
+          fi
+
+      # The changelog should describe the tag being cut, not still say
+      # Upcoming.
+      - name: Check the changelog has an entry for this tag
+        run: |
+          if ! grep -q "^## ${GITHUB_REF_NAME}$" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no '## ${GITHUB_REF_NAME}' heading"
+            exit 1
+          fi
+
+      # optly.h is the artifact. Shipping it as a release asset means a user
+      # can pin a version without cloning or trusting a moving branch.
+      - name: Package
+        run: |
+          mkdir -p dist
+          cp optly.h LICENSE README.md CHANGELOG.md dist/
+          tar -czf "optly-${GITHUB_REF_NAME}.tar.gz" -C dist .
+          sha256sum optly.h "optly-${GITHUB_REF_NAME}.tar.gz" > checksums.txt
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            optly.h
+            optly-${{ github.ref_name }}.tar.gz
+            checksums.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
