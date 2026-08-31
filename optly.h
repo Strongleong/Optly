@@ -44,7 +44,7 @@
         // Values are unions, so you need to specify member of value with correct type some way
         { "threads",          't',         "Worker threads", false, {.as_uint32 = 4},       OPTLY_TYPE_UINT32 },
 
-        // Flag arrays should alwasy ends with NULL_FLAG. Try to not forget about it :)
+        // Flag arrays should always ends with NULL_FLAG. Try to not forget about it :)
         NULL_FLAG,
       },
 
@@ -83,7 +83,7 @@
             )
           ),
 
-          // Positioanl arguments can be defined lilke this
+          // Positioanl arguments can be defined like this
           optly_positionals(optly_positional("address", "Address to listen on", .min = 0, .max = 1)),
         ),
       }
@@ -111,7 +111,7 @@
       OptlyPositional *address = optly_get_positional(&cmd, "address");
 
       if (address && address->count == 1) {
-        printf("Address: %s\n", address->values[1]);
+        printf("Address: %s\n", address->values[0]);
       } else {
         printf("Address: 0.0.0.0\n");
       }
@@ -221,10 +221,10 @@
   The best way to control logging is to use Logcie library (https://github.com/strongleong/logcie).
   Or have a look at OPTLY_LOG family of macros.
 
-  Licese
+  License
   ------
 
-  MIT/Public domain - choose whitchever you prefer
+  MIT/Public domain - choose whichever you prefer
 */
 
 #ifndef OPTLY_H
