@@ -7,7 +7,6 @@
 // It parses its own command line with optly, so the library is exercised by
 // the thing that builds it.
 
-#include <dirent.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -27,20 +26,39 @@
 #endif
 
 #define mkdir(path, mode) _mkdir(path)
+#define chdir(path)       _chdir(path)
 #define PATH_SEP          "\\"
 #define PATH_LIST_SEP     ';'
+#define EXE_SUFFIX        ".exe"
+
+// NOTE: MSVC's sys/stat.h has the S_IF* constants but not the S_IS* macros
+// that C99 code uses to test them.
+#ifndef S_ISDIR
+#define S_ISDIR(mode) (((mode) & _S_IFMT) == _S_IFDIR)
+#endif
+
+#ifndef S_ISREG
+#define S_ISREG(mode) (((mode) & _S_IFMT) == _S_IFREG)
+#endif
 #else
+#include <dirent.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
 #define PATH_SEP      "/"
 #define PATH_LIST_SEP ':'
+#define EXE_SUFFIX    ""
 #endif  // _WIN32
 
 #define PATH_MAX_LEN 4096
 #define CMD_MAX_ARGV 64
 #define MAX_ENTRIES  128
+
+// NOTE: sized to hold a Windows WIN32_FIND_DATAA.cFileName, which is MAX_PATH
+// (260) bytes. A smaller buffer is a truncation warning there and -Werror is
+// on.
+#define NAME_MAX_LEN 260
 
 // NOTE: strum is the reference .tspec runner, but the format is not tied to
 // it. --tspec-runner exists so a second implementation can be dropped in
@@ -100,7 +118,45 @@ static int compare_names(const void *a, const void *b) {
   return strcmp(*(const char *const *)a, *(const char *const *)b);
 }
 
-static int list_dir(const char *dir, bool (*filter)(const char *name), char names[][256], int max) {
+// Collects the names of the entries in dir that pass filter. Sorted, so a
+// build does not depend on the order the filesystem hands them back, and the
+// two implementations agree on what a run looks like.
+static int collect_names(const char *dir, bool (*filter)(const char *name), char names[][NAME_MAX_LEN], int max) {
+#ifdef _WIN32
+  // NOTE: the ...A forms are used explicitly. The unsuffixed names change
+  // meaning under UNICODE, and this file deals in char * paths throughout.
+  char             pattern[PATH_MAX_LEN];
+  WIN32_FIND_DATAA fd;
+
+  if (snprintf(pattern, sizeof(pattern), "%s" PATH_SEP "*", dir) < 0) {
+    FATAL("Path too long: %s", dir);
+    return -1;
+  }
+
+  HANDLE find = FindFirstFileA(pattern, &fd);
+
+  if (find == INVALID_HANDLE_VALUE) {
+    FATAL("Can not open %s", dir);
+    return -1;
+  }
+
+  int count = 0;
+
+  do {
+    if (fd.cFileName[0] == '.') {
+      continue;
+    }
+
+    if (filter && !filter(fd.cFileName)) {
+      continue;
+    }
+
+    snprintf(names[count], NAME_MAX_LEN, "%s", fd.cFileName);
+    count++;
+  } while (count < max && FindNextFileA(find, &fd));
+
+  FindClose(find);
+#else
   DIR *d = opendir(dir);
 
   if (!d) {
@@ -119,11 +175,12 @@ static int list_dir(const char *dir, bool (*filter)(const char *name), char name
       continue;
     }
 
-    snprintf(names[count], 256, "%s", e->d_name);
+    snprintf(names[count], NAME_MAX_LEN, "%s", e->d_name);
     count++;
   }
 
   closedir(d);
+#endif
 
   char *ptrs[MAX_ENTRIES];
 
@@ -133,14 +190,14 @@ static int list_dir(const char *dir, bool (*filter)(const char *name), char name
 
   qsort(ptrs, (size_t)count, sizeof(ptrs[0]), compare_names);
 
-  char sorted[MAX_ENTRIES][256];
+  char sorted[MAX_ENTRIES][NAME_MAX_LEN];
 
   for (int i = 0; i < count; i++) {
-    snprintf(sorted[i], 256, "%s", ptrs[i]);
+    snprintf(sorted[i], NAME_MAX_LEN, "%s", ptrs[i]);
   }
 
   for (int i = 0; i < count; i++) {
-    snprintf(names[i], 256, "%s", sorted[i]);
+    snprintf(names[i], NAME_MAX_LEN, "%s", sorted[i]);
   }
 
   return count;
@@ -158,10 +215,44 @@ static bool is_executable(const char *path) {
 
 // Resolves a bare name against PATH so a missing runner is reported before
 // anything is compiled, rather than as a failed exec halfway through.
-static bool find_executable(const char *name, char *out, size_t cap) {
-  if (strchr(name, PATH_SEP[0]) != NULL) {
+static bool has_separator(const char *path) {
+#ifdef _WIN32
+  // NOTE: Windows accepts both, and people type both.
+  return strchr(path, '\\') != NULL || strchr(path, '/') != NULL;
+#else
+  return strchr(path, '/') != NULL;
+#endif
+}
+
+// A bare name on Windows is spelled without .exe but stored with it, so both
+// spellings have to be tried before deciding the program is missing.
+static bool is_executable_named(const char *dir, size_t dir_len, const char *name, char *out, size_t cap) {
+  if (dir) {
+    snprintf(out, cap, "%.*s" PATH_SEP "%s", (int)dir_len, dir, name);
+  } else {
     snprintf(out, cap, "%s", name);
-    return is_executable(out);
+  }
+
+  if (is_executable(out)) {
+    return true;
+  }
+
+  if (EXE_SUFFIX[0] == '\0') {
+    return false;
+  }
+
+  if (dir) {
+    snprintf(out, cap, "%.*s" PATH_SEP "%s" EXE_SUFFIX, (int)dir_len, dir, name);
+  } else {
+    snprintf(out, cap, "%s" EXE_SUFFIX, name);
+  }
+
+  return is_executable(out);
+}
+
+static bool find_executable(const char *name, char *out, size_t cap) {
+  if (has_separator(name)) {
+    return is_executable_named(NULL, 0, name, out, cap);
   }
 
   const char *path = getenv("PATH");
@@ -174,12 +265,8 @@ static bool find_executable(const char *name, char *out, size_t cap) {
     const char *sep = strchr(path, PATH_LIST_SEP);
     size_t      len = sep ? (size_t)(sep - path) : strlen(path);
 
-    if (len > 0 && len < cap) {
-      snprintf(out, cap, "%.*s" PATH_SEP "%s", (int)len, path, name);
-
-      if (is_executable(out)) {
-        return true;
-      }
+    if (len > 0 && len < cap && is_executable_named(path, len, name, out, cap)) {
+      return true;
     }
 
     if (!sep) {
@@ -257,7 +344,7 @@ static bool build_example(const char *cc, const char *std, bool debug, const cha
   char out[PATH_MAX_LEN];
   char stdflag[64];
 
-  char stem[256];
+  char stem[NAME_MAX_LEN];
 
   snprintf(stdflag, sizeof(stdflag), "-std=%s", std);
   snprintf(stem, sizeof(stem), "%s", name);
@@ -295,8 +382,8 @@ static bool build_example(const char *cc, const char *std, bool debug, const cha
 }
 
 static bool build_examples(const char *cc, const char *std, bool debug) {
-  char names[MAX_ENTRIES][256];
-  int  count = list_dir("examples", has_c_extension, names, MAX_ENTRIES);
+  char names[MAX_ENTRIES][NAME_MAX_LEN];
+  int  count = collect_names("examples", has_c_extension, names, MAX_ENTRIES);
 
   if (count < 0) {
     return false;
@@ -356,8 +443,8 @@ static bool run_tests(const char *runner_name) {
 }
 
 static bool clean(void) {
-  char names[MAX_ENTRIES][256];
-  int  count = list_dir(outdir, NULL, names, MAX_ENTRIES);
+  char names[MAX_ENTRIES][NAME_MAX_LEN];
+  int  count = collect_names(outdir, NULL, names, MAX_ENTRIES);
 
   if (count < 0) {
     return false;
