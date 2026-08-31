@@ -1196,7 +1196,7 @@ OPTLYDEF double optly_flag_value_double(const OptlyCommand *command, const char 
 
 OPTLYDEF char *optly_flag_value_enum(const OptlyCommand *command, const char *name) {
   const OptlyFlag *flag = optly_get_flag(command->flags, name);
-  return flag ? flag->value.as_enum[0] : NULL;
+  return flag ? flag->value.as_enum[0] : "";
 }
 
 OPTLYDEF OptlyPositional *optly_get_positional(OptlyCommand *command, const char *name) {
