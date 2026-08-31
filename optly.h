@@ -488,7 +488,7 @@ OPTLYDEF OptlyPositional *optly_get_positional(OptlyCommand *command, const char
 
 #else
 
-#if defined(LOGCIE) && LOGCIE_VERSION_NUMBER < 1200
+#if defined(LOGCIE) && LOGCIE_VERSION_NUMBER < 1200 && (defined (__GNUC__) || defined(__clang__))
 #warning "Your Logcie version is too old. Falling back to fprintf logging."
 #endif
 
