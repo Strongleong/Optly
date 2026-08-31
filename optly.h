@@ -83,7 +83,7 @@
             )
           ),
 
-          // Positioanl arguments can be defined like this
+          // Positional arguments can be defined like this
           optly_positionals(optly_positional("address", "Address to listen on", .min = 0, .max = 1)),
         ),
       }
