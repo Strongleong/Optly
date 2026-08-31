@@ -466,6 +466,7 @@ OPTLYDEF uint32_t         optly_flag_value_uint32(const OptlyCommand *command, c
 OPTLYDEF uint64_t         optly_flag_value_uint64(const OptlyCommand *command, const char *name);
 OPTLYDEF float            optly_flag_value_float(const OptlyCommand *command, const char *name);
 OPTLYDEF double           optly_flag_value_double(const OptlyCommand *command, const char *name);
+OPTLYDEF char            *optly_flag_value_enum(const OptlyCommand *command, const char *name);
 OPTLYDEF OptlyPositional *optly_get_positional(OptlyCommand *command, const char *name);
 
 #endif  // OPTLY_H
@@ -960,7 +961,16 @@ static void optly_parse_long_flags(char ***argv_ptr, int *argc_ptr, OptlyFlag *f
 
     tmp[len]  = '\0';
     char *eq2 = strchr(tmp, '=');
-    *eq2      = '\0';
+
+    // NOTE: a flag name longer than the buffer is truncated before its '=',
+    // so the copy may not contain one even though the argument did.
+    if (!eq2) {
+      OPTLY_LOG(WARN, "Unknown flag: %s", *argv);
+      optly_push_error(errs, OPTLY_ERR_UNKNOWN_FLAG, *argv);
+      return;
+    }
+
+    *eq2 = '\0';
 
     arg   = tmp;
     value = eq + 1;
