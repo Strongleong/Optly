@@ -2,6 +2,8 @@
 
 ## Upcoming
 
+## v2.4.0
+
 ### Added
 
 - `OPTLY_NULL_FLAG`, `OPTLY_NULL_COMMAND` and `OPTLY_NULL_POSITIONAL`.
