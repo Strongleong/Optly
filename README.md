@@ -241,6 +241,12 @@ Define these before including optly:
 Optly is a C library. It is not tested as C++ and does not try to compile as
 C++ -- use argparse, CLI11 or cxxopts there.
 
+## Tests
+
+Test are located in `./tests/` folder (duh!). We are using .tspec tests format, using strum as tspec runner.
+
+Read more about tspec and strum at [https://github.com/strongleong/strum](https://github.com/strongleong/strum)
+
 ## Design Goals
 
 Optly focuses on:
