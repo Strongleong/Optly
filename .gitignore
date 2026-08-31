@@ -2,3 +2,5 @@
 compile_commands.json
 out
 **/.side_effects/
+out/
+build
