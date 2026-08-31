@@ -472,7 +472,6 @@ OPTLYDEF OptlyPositional *optly_get_positional(OptlyCommand *command, const char
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <strings.h>
 
 // Logcie integration
 
