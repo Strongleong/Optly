@@ -221,6 +221,12 @@
   The best way to control logging is to use Logcie library (https://github.com/strongleong/logcie).
   Or have a look at OPTLY_LOG family of macros.
 
+  C only
+  ------
+
+  Optly is a C library. It is not tested as C++ and does not try to compli as C++. User argparse,
+  CLI11 or cxxorts there.
+
   License
   ------
 
