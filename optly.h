@@ -44,8 +44,8 @@
         // Values are unions, so you need to specify member of value with correct type some way
         { "threads",          't',         "Worker threads", false, {.as_uint32 = 4},       OPTLY_TYPE_UINT32 },
 
-        // Flag arrays should always ends with NULL_FLAG. Try to not forget about it :)
-        NULL_FLAG,
+        // Flag arrays should always ends with OPTLY_NULL_FLAG. Try to not forget about it :)
+        OPTLY_NULL_FLAG,
       },
 
       // This is your commands. (git `commit`, docker `compose` `up`)
@@ -54,7 +54,7 @@
         // Instead of defining whole struct manually you can use helper functions
         optly_command("run", "Runs server",
 
-          // optly_flags macro deals with type castings and closing array with NULL_FLAG
+          // optly_flags macro deals with type castings and closing array with OPTLY_NULL_FLAG
           optly_flags(
 
             // This is *command* flag. `./app -p 8080 run` will not work, but `./app run -p 8080` will
@@ -379,9 +379,18 @@ OPTLYDEF OptlyError  optly_errors_at(const OptlyErrors *errs, size_t i);
 OPTLYDEF const char *optly_error_message(OptlyErrorKind err);
 OPTLYDEF void        optly_error_print(const OptlyErrors *errs);
 
-#define NULL_FLAG       {.fullname = NULL, .shortname = 0, .value = {.as_int64 = 0}, .type = 0}
-#define NULL_COMMAND    {.name = NULL, .flags = NULL}
-#define NULL_POSITIONAL {.name = NULL}
+#define OPTLY_NULL_FLAG       {.fullname = NULL, .shortname = 0, .value = {.as_int64 = 0}, .type = 0}
+#define OPTLY_NULL_COMMAND    {.name = NULL, .flags = NULL}
+#define OPTLY_NULL_POSITIONAL {.name = NULL}
+
+/**
+ *  WARN: the unprefixed spellings are the original names and are kept so
+ * existing code builds. They will be removed in v3
+ * @deprecated
+ */
+#define NULL_FLAG       OPTLY_NULL_FLAG
+#define NULL_COMMAND    OPTLY_NULL_COMMAND
+#define NULL_POSITIONAL OPTLY_NULL_POSITIONAL
 
 // NOTE: Forcing designated initializer for automatically zero-initializing missing fields
 #define optly_flag(name, ...)        \
@@ -395,22 +404,22 @@ OPTLYDEF void        optly_error_print(const OptlyErrors *errs);
     .name = (namme), __VA_ARGS__  \
   }
 
-#define optly_flags(...)   \
-  (OptlyFlag[]) {          \
-    __VA_ARGS__, NULL_FLAG \
+#define optly_flags(...)         \
+  (OptlyFlag[]) {                \
+    __VA_ARGS__, OPTLY_NULL_FLAG \
   }
-#define optly_commands(...)   \
-  (OptlyCommand[]) {          \
-    __VA_ARGS__, NULL_COMMAND \
+#define optly_commands(...)         \
+  (OptlyCommand[]) {                \
+    __VA_ARGS__, OPTLY_NULL_COMMAND \
   }
 
 #define optly_positional(namme, ...) \
   (OptlyPositional) {                \
     .name = (namme), __VA_ARGS__     \
   }
-#define optly_positionals(...)   \
-  (OptlyPositional[]) {          \
-    __VA_ARGS__, NULL_POSITIONAL \
+#define optly_positionals(...)         \
+  (OptlyPositional[]) {                \
+    __VA_ARGS__, OPTLY_NULL_POSITIONAL \
   }
 
 #define optly_flag_bool(name, ...)   optly_flag(name, __VA_ARGS__, .type = OPTLY_TYPE_BOOL)
@@ -453,20 +462,20 @@ static inline bool optly_is_command_null(const OptlyCommand *cmd) {
   return cmd == NULL || cmd->name == NULL;
 }
 
-OPTLYDEF bool             optly_flag_value_bool(const OptlyCommand *command, const char *name);
-OPTLYDEF char             optly_flag_value_char(const OptlyCommand *command, const char *name);
-OPTLYDEF char            *optly_flag_value_string(const OptlyCommand *command, const char *name);
-OPTLYDEF int8_t           optly_flag_value_int8(const OptlyCommand *command, const char *name);
-OPTLYDEF int16_t          optly_flag_value_int16(const OptlyCommand *command, const char *name);
-OPTLYDEF int32_t          optly_flag_value_int32(const OptlyCommand *command, const char *name);
-OPTLYDEF int64_t          optly_flag_value_int64(const OptlyCommand *command, const char *name);
-OPTLYDEF uint8_t          optly_flag_value_uint8(const OptlyCommand *command, const char *name);
-OPTLYDEF uint16_t         optly_flag_value_uint16(const OptlyCommand *command, const char *name);
-OPTLYDEF uint32_t         optly_flag_value_uint32(const OptlyCommand *command, const char *name);
-OPTLYDEF uint64_t         optly_flag_value_uint64(const OptlyCommand *command, const char *name);
-OPTLYDEF float            optly_flag_value_float(const OptlyCommand *command, const char *name);
-OPTLYDEF double           optly_flag_value_double(const OptlyCommand *command, const char *name);
-OPTLYDEF char            *optly_flag_value_enum(const OptlyCommand *command, const char *name);
+OPTLYDEF bool     optly_flag_value_bool(const OptlyCommand *command, const char *name);
+OPTLYDEF char     optly_flag_value_char(const OptlyCommand *command, const char *name);
+OPTLYDEF char    *optly_flag_value_string(const OptlyCommand *command, const char *name);
+OPTLYDEF int8_t   optly_flag_value_int8(const OptlyCommand *command, const char *name);
+OPTLYDEF int16_t  optly_flag_value_int16(const OptlyCommand *command, const char *name);
+OPTLYDEF int32_t  optly_flag_value_int32(const OptlyCommand *command, const char *name);
+OPTLYDEF int64_t  optly_flag_value_int64(const OptlyCommand *command, const char *name);
+OPTLYDEF uint8_t  optly_flag_value_uint8(const OptlyCommand *command, const char *name);
+OPTLYDEF uint16_t optly_flag_value_uint16(const OptlyCommand *command, const char *name);
+OPTLYDEF uint32_t optly_flag_value_uint32(const OptlyCommand *command, const char *name);
+OPTLYDEF uint64_t optly_flag_value_uint64(const OptlyCommand *command, const char *name);
+OPTLYDEF float    optly_flag_value_float(const OptlyCommand *command, const char *name);
+OPTLYDEF double   optly_flag_value_double(const OptlyCommand *command, const char *name);
+OPTLYDEF char    *optly_flag_value_enum(const OptlyCommand *command, const char *name);
 
 #endif  // OPTLY_H
 
@@ -494,7 +503,7 @@ OPTLYDEF char            *optly_flag_value_enum(const OptlyCommand *command, con
 
 #else
 
-#if defined(LOGCIE) && LOGCIE_VERSION_NUMBER < 1200 && (defined (__GNUC__) || defined(__clang__))
+#if defined(LOGCIE) && LOGCIE_VERSION_NUMBER < 1200 && (defined(__GNUC__) || defined(__clang__))
 #warning "Your Logcie version is too old. Falling back to fprintf logging."
 #endif
 
