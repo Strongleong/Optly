@@ -467,7 +467,6 @@ OPTLYDEF uint64_t         optly_flag_value_uint64(const OptlyCommand *command, c
 OPTLYDEF float            optly_flag_value_float(const OptlyCommand *command, const char *name);
 OPTLYDEF double           optly_flag_value_double(const OptlyCommand *command, const char *name);
 OPTLYDEF char            *optly_flag_value_enum(const OptlyCommand *command, const char *name);
-OPTLYDEF OptlyPositional *optly_get_positional(OptlyCommand *command, const char *name);
 
 #endif  // OPTLY_H
 
