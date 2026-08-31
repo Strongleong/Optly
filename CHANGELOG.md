@@ -5,10 +5,14 @@
 ## Added
 
 - Added tests, using tspec tests format and strum runner.
+- `optly_flag_value_enum` is now actually declared in the header part of
+  the library.
 
 ## Fixed
 
 - Fixed crash when argument length is not truncated correctly.
+- `OPTLY_HELP_SHORT_FLAG` and `OPTLY_VERSION_SHORT_FLAG` are now respected
+  in `optly_usage_flags()`
 
 ## v2.3.6
 
