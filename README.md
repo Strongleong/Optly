@@ -138,7 +138,12 @@ Equivalent to:
 
     -a -b -c
 
-*(Batched flags must be boolean.)*
+The last flag in a batch may take a value, the way tar does it:
+
+    tar -xzvf archive.tar
+
+Everything before the last one must be boolean -- a flag in the middle has no
+way to say where its value ends.
 
 ## Commands
 

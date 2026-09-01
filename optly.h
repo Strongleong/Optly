@@ -141,7 +141,8 @@
     --threads 4
     -t 4
 
-  Short flags can be batched.
+  Short flags can be batched. Every flag in a batch must be boolean except the
+  last, which may take a value, the way tar spells `-xzvf archive.tar`.
 
     -abc  ->  -a -b -c
 
@@ -913,7 +914,14 @@ inline static bool optly_is_version_flag(char *arg) {
           strchr(arg, OPTLY_VERSION_SHORT_FLAG[1]) != NULL);
 }
 
-static void optly_parse_batch_flags(char *arg, OptlyFlag *flags, OptlyErrors *errs) {
+// A batch is short bool flags with one optional value-taking flag at the end,
+// the way tar spells -xzvf archive.tar. Only the last character may be
+// non-boolean: anything earlier has no way to say where its value stops.
+static void optly_parse_batch_flags(char ***argv_ptr, int *argc_ptr, OptlyFlag *flags, OptlyErrors *errs) {
+  char **argv = *argv_ptr;
+  int    argc = *argc_ptr;
+  char  *arg  = *argv;
+
   if (strchr(arg, '=') != NULL) {
     return;
   }
@@ -932,16 +940,29 @@ static void optly_parse_batch_flags(char *arg, OptlyFlag *flags, OptlyErrors *er
     }
 
     if (flag->type != OPTLY_TYPE_BOOL) {
-      OPTLY_LOG(WARN, "cannot batch non-boolean flags (invalid flag in %s)", sarg);
-      optly_push_error(errs, OPTLY_ERR_BATCH_NON_BOOL, &flag->shortname);
-      continue;
+      if (c[1] != '\0') {
+        OPTLY_LOG(WARN, "cannot batch non-boolean flags (invalid flag in %s)", sarg);
+        optly_push_error(errs, OPTLY_ERR_BATCH_NON_BOOL, &flag->shortname);
+        continue;
+      }
+
+      if (argc <= 1) {
+        OPTLY_LOG(WARN, "No value for flag %s", sarg);
+        optly_push_error(errs, OPTLY_ERR_MISSING_VALUE, sarg);
+        break;
+      }
+
+      SHIFT_ARG(argv, argc);
+      optly_flag_set_value(flag, *argv, errs);
+      break;
     }
 
     flag->value.as_bool = true;
     flag->present       = true;
   }
 
-  return;
+  *argv_ptr = argv;
+  *argc_ptr = argc;
 }
 
 static void optly_parse_long_flags(char ***argv_ptr, int *argc_ptr, OptlyFlag *flags, OptlyErrors *errs) {
@@ -1022,7 +1043,7 @@ static void optly_parse_flags(char ***argv_ptr, int *argc_ptr, OptlyFlag *flags,
   bool is_batch_short = (arg[0] == '-' && arg[1] != '-' && strlen(arg) > 2) && arg[2] != '=';
 
   if (is_batch_short) {
-    optly_parse_batch_flags(arg, flags, errs);
+    optly_parse_batch_flags(argv_ptr, argc_ptr, flags, errs);
   } else {
     optly_parse_long_flags(argv_ptr, argc_ptr, flags, errs);
   }
