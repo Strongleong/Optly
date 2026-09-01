@@ -136,3 +136,63 @@ force=0
 threads=4
 out=bin/app
 
+:test a_batch_may_end_with_a_flag_that_takes_a_value
+:command compile
+:blob executable 2
+cc
+:blob args 79
+-std=c99 -Wall -Wextra -Werror -pedantic -I../.. flags.c -o .side_effects/flags
+:int return 0
+:command run
+:blob executable 19
+.side_effects/flags
+:blob args 12
+-vqo bin/app
+:int return 0
+:blob stdout 48
+verbose=1
+quiet=1
+force=0
+threads=4
+out=bin/app
+
+:test the_value_taking_flag_may_be_the_only_one_after_bools
+:command compile
+:blob executable 2
+cc
+:blob args 79
+-std=c99 -Wall -Wextra -Werror -pedantic -I../.. flags.c -o .side_effects/flags
+:int return 0
+:command run
+:blob executable 19
+.side_effects/flags
+:blob args 5
+-vt 8
+:int return 0
+:blob stdout 46
+verbose=1
+quiet=0
+force=0
+threads=8
+out=a.out
+
+:test a_batch_of_one_value_taking_flag_still_works
+:command compile
+:blob executable 2
+cc
+:blob args 79
+-std=c99 -Wall -Wextra -Werror -pedantic -I../.. flags.c -o .side_effects/flags
+:int return 0
+:command run
+:blob executable 19
+.side_effects/flags
+:blob args 10
+-o bin/app
+:int return 0
+:blob stdout 48
+verbose=0
+quiet=0
+force=0
+threads=4
+out=bin/app
+

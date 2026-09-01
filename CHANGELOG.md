@@ -2,6 +2,13 @@
 
 ## Upcoming
 
+### Added
+
+- The last flag in a batch of short flags can now take a value, the way tar
+  spells `-xzvf archive.tar`. So `-vqo out.txt` works. Everything before the
+  last flag still has to be boolean, since a flag in the middle has no way to
+  say where its value ends.
+
 ## v2.4.0
 
 ### Added

@@ -66,7 +66,24 @@ a.txt
 errors=1
 0: Required flag is not present (token)
 
-:test batching_a_non_bool_flag_is_reported
+:test a_non_bool_flag_before_the_end_of_a_batch_is_reported
+:command compile
+:blob executable 2
+cc
+:blob args 81
+-std=c99 -Wall -Wextra -Werror -pedantic -I../.. errors.c -o .side_effects/errors
+:int return 0
+:command run
+:blob executable 20
+.side_effects/errors
+:blob args 11
+-tT x a.txt
+:int return 0
+:blob stdout 47
+errors=1
+0: Cannot batch non-boolean flags (t)
+
+:test a_batch_ending_in_a_value_flag_with_no_value_is_reported
 :command compile
 :blob executable 2
 cc
@@ -77,14 +94,13 @@ cc
 :blob executable 20
 .side_effects/errors
 :blob args 3
--tT
+-vT
 :int return 0
-:blob stdout 168
-errors=4
-0: Cannot batch non-boolean flags (t)
-1: Cannot batch non-boolean flags (T)
-2: Required flag is not present (token)
-3: Not enough positional arguments (files)
+:blob stdout 121
+errors=3
+0: Flag requires a value ()
+1: Required flag is not present (token)
+2: Not enough positional arguments (files)
 
 :test too_few_positionals_are_reported
 :command compile

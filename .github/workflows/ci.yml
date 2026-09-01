@@ -1,0 +1,157 @@
+name: CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  # The .tspec suite is the real check. strum is POSIX-only, so this is
+  # everywhere it can run.
+  tests:
+    name: tests (${{ matrix.os }}, ${{ matrix.cc }}, ${{ matrix.std }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        cc: [gcc, clang]
+        std: [c99, c11, c17]
+    steps:
+      - uses: actions/checkout@v4
+
+      # Built from source rather than pulled from a release, so this does not
+      # depend on an asset existing for the runner's platform.
+      - name: Build strum
+        run: |
+          git clone --depth 1 https://github.com/Strongleong/Strum strum
+          cd strum
+          cc build.c -o build
+          ./build -c ${{ matrix.cc }}
+          echo "$PWD/out" >> "$GITHUB_PATH"
+
+      - name: Build examples
+        run: |
+          cc build.c -o build
+          ./build -c ${{ matrix.cc }} --std ${{ matrix.std }}
+
+      - name: Run tests
+        run: ./build tests
+
+  # Windows has no strum, so these jobs answer a narrower question: does the
+  # header compile, and does a program built with it behave. Each step asks one
+  # thing, so a red run names its own cause instead of leaving three
+  # candidates. Commands are echoed and output is compared against exact bytes;
+  # a green tick here means something specific happened.
+  mingw:
+    name: windows (mingw, ${{ matrix.std }})
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        std: [c99, c11, c17]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compile the header on its own
+        run: |
+          set -x
+          gcc -std=${{ matrix.std }} -Wall -Wextra -Werror -pedantic \
+              -DOPTLY_IMPLEMENTATION -I. -c -x c optly.h -o header.o
+
+      - name: Compile the build tool
+        run: |
+          set -x
+          gcc -std=${{ matrix.std }} -Wall -Wextra -Werror -pedantic build.c -o build.exe
+
+      - name: Build the examples with it
+        run: |
+          set -x
+          ./build.exe -c gcc --std ${{ matrix.std }}
+          ls -l out
+
+      - name: A program built with optly parses its command line
+        run: |
+          set -x
+          gcc -std=${{ matrix.std }} -Wall -Wextra -Werror -pedantic \
+              -I. tests/flags/flags.c -o flags.exe
+          ./flags.exe -vqf --threads=16 --out=bin/app > got.txt
+          printf 'verbose=1\nquiet=1\nforce=1\nthreads=16\nout=bin/app\n' > want.txt
+          diff -u want.txt got.txt
+
+  # MSVC is the toolchain optly has never been built with. /std:c11 is not
+  # optional: the whole DSL is designated initializers and compound literals,
+  # and MSVC rejects both in its default C mode.
+  msvc:
+    name: windows (msvc)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Compile the header on its own
+        shell: cmd
+        run: |
+          echo on
+          cl /W4 /WX /std:c11 /TC /DOPTLY_IMPLEMENTATION /I. /c optly.h /Fo:header.obj
+
+      - name: Compile the build tool
+        shell: cmd
+        run: |
+          echo on
+          cl /W4 /WX /std:c11 /TC build.c /Fe:build.exe
+
+      - name: Build the examples with it
+        shell: cmd
+        run: |
+          echo on
+          build.exe -c cl --std c11
+          dir out
+
+      - name: A program built with optly parses its command line
+        shell: cmd
+        run: |
+          echo on
+          cl /W4 /WX /std:c11 /TC /I. tests\flags\flags.c /Fe:flags.exe
+          flags.exe -vqf --threads=16 --out=bin/app > got.txt
+          type got.txt
+
+      - name: Compare that output against the expected bytes
+        shell: bash
+        run: |
+          printf 'verbose=1\nquiet=1\nforce=1\nthreads=16\nout=bin/app\n' > want.txt
+          diff -u --strip-trailing-cr want.txt got.txt
+
+  sanitizers:
+    name: sanitizers
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build strum
+        run: |
+          git clone --depth 1 https://github.com/Strongleong/Strum strum
+          cd strum
+          cc build.c -o build
+          ./build -c gcc
+          echo "$PWD/out" >> "$GITHUB_PATH"
+
+      # The over-long --flag=value crash fixed in v2.4.0 was a NULL write that
+      # a normal build can miss. ASan is how that class gets caught next time.
+      - name: Test fixtures under AddressSanitizer
+        run: |
+          for fixture in tests/*/*.c; do
+            gcc -std=c99 -Wall -Wextra -pedantic -fsanitize=address,undefined \
+                -I. "$fixture" -o /tmp/fixture
+            /tmp/fixture >/dev/null 2>&1 || true
+          done
+
+      - name: Tests
+        run: |
+          cc build.c -o build
+          ./build tests
