@@ -2,6 +2,8 @@
 
 ## Upcoming
 
+## v2.5.0
+
 ### Added
 
 - The last flag in a batch of short flags can now take a value, the way tar

@@ -1,5 +1,5 @@
 /*
-  optly.h — v2.4.0
+  optly.h — v2.5.0
   Single-header command line argument parser for C.
 
   Features
@@ -247,7 +247,7 @@
 
 // Versioning macros
 #define OPTLY_VERSION_MAJOR         2
-#define OPTLY_VERSION_MINOR         4
+#define OPTLY_VERSION_MINOR         5
 #define OPTLY_VERSION_RELEASE       0
 #define OPTLY_VERSION_NUMBER        (OPTLY_VERSION_MAJOR * 100 * 100 + OPTLY_VERSION_MINOR * 100 + OPTLY_VERSION_RELEASE)
 #define OPTLY_VERSION_FULL          OPTLY_VERSION_MAJOR.OPTLY_VERSION_MINOR.OPTLY_VERSION_RELEASE
