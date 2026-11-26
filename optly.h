@@ -219,6 +219,8 @@
   - testing
   - custom error handling
 
+  You can define OPTLY_USAGE_ON_ERROR to automatically call `optly_uage()` if parsing error occuresd.
+
   The best way to control logging is to use Logcie library (https://github.com/strongleong/logcie).
   Or have a look at OPTLY_LOG family of macros.
 
@@ -1347,6 +1349,9 @@ OPTLYDEF OptlyErrors optly_parse_args(int argc, char *argv[], OptlyCommand *main
 
 #ifndef OPTLY_NO_EXIT
   if (errs.count > 0) {
+    #ifdef OPTLY_USAGE_ON_ERROR
+      optly_usage(current_cmd);
+    #endif
     exit(EXIT_FAILURE);
   }
 #endif
