@@ -230,16 +230,17 @@ optly_parse_args(argc, argv, &cmd, "1.0.0");
 
 Define these before including optly:
 
-| Macro                      | Default             | Effect                                           |
-| -----                      | -------             | ------                                           |
-| `OPTLY_NO_EXIT`            | off                 | Never call `exit()`; return the errors instead   |
-| `OPTLY_MAX_POSITIONALS`    | 64                  | Values one positional can hold                   |
-| `OPTLY_MAX_ERRORS`         | 32                  | Errors collected before further ones are dropped |
-| `OPTLY_FLAG_BUFFER_LENGTH` | 256                 | Buffer used while formatting help output         |
-| `OPTLY_LOG`                | `fprintf` to stderr | Where optly's own messages go                    |
-| `OPTLY_HELP_SHORT_FLAG`    | `"-h"`              | Short flag for generated help                    |
-| `OPTLY_VERSION_SHORT_FLAG` | `"-v"`              | Short flag for generated version                 |
-| `OPTLYDEF`                 | empty               | Linkage of the public functions                  |
+| Macro                      | Default             | Effect                                                 |
+| -----                      | -------             | ------                                                 |
+| `OPTLY_USAGE_ON_ERROR`     | off                 | Automatically call `optly_uage()` on erros before exit |
+| `OPTLY_NO_EXIT`            | off                 | Never call `exit()`; return the errors instead         |
+| `OPTLY_MAX_POSITIONALS`    | 64                  | Values one positional can hold                         |
+| `OPTLY_MAX_ERRORS`         | 32                  | Errors collected before further ones are dropped       |
+| `OPTLY_FLAG_BUFFER_LENGTH` | 256                 | Buffer used while formatting help output               |
+| `OPTLY_LOG`                | `fprintf` to stderr | Where optly's own messages go                          |
+| `OPTLY_HELP_SHORT_FLAG`    | `"-h"`              | Short flag for generated help                          |
+| `OPTLY_VERSION_SHORT_FLAG` | `"-v"`              | Short flag for generated version                       |
+| `OPTLYDEF`                 | empty               | Linkage of the public functions                        |
 
 ## C only
 
