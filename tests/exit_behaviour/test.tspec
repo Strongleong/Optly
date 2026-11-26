@@ -31,3 +31,24 @@ cc
 :blob stdout 9
 survived
 
+:test usage_on_error_exit_shows
+:command compile
+:blob executable 2
+cc
+:blob args 120
+-std=c99 -Wall -Wextra -Werror -pedantic -I../.. exit_behaviour.c -o .side_effects/exit_behaviour -DOPTLY_USAGE_ON_ERROR
+:int return 0
+:command run
+:blob executable 28
+.side_effects/exit_behaviour
+:blob args 6
+--nope
+:int return 1
+:blob stderr 105
+WARN: Unknown flag: --nope
+Usage: app [FLAGS]
+
+FLAGS
+  -t --threads <u32>    Worker threads (default: 4)
+
+

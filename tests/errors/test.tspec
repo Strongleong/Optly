@@ -96,9 +96,9 @@ cc
 :blob args 3
 -vT
 :int return 0
-:blob stdout 121
+:blob stdout 125
 errors=3
-0: Flag requires a value ()
+0: Flag requires a value (token)
 1: Required flag is not present (token)
 2: Not enough positional arguments (files)
 
