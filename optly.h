@@ -948,7 +948,7 @@ static void optly_parse_batch_flags(char ***argv_ptr, int *argc_ptr, OptlyFlag *
 
       if (argc <= 1) {
         OPTLY_LOG(WARN, "No value for flag %s", sarg);
-        optly_push_error(errs, OPTLY_ERR_MISSING_VALUE, sarg);
+        optly_push_error(errs, OPTLY_ERR_MISSING_VALUE, flag->fullname);
         break;
       }
 
