@@ -2,6 +2,17 @@
 
 ## Upcoming
 
+## v2.6.0
+
+### Added
+
+- `OPTLY_USAGE_ON_ERROR`. If defined optly will automatically call
+  `optly_usage()` when error occursed and `OPTLY_NO_EXIT` is NOT defined
+
+### Fixed
+- Now when `OPTLY_ERR_MISSING_VALUE` error is raised in batched flag parsing
+  it will actually pass name of the flag that miss its value
+
 ## v2.5.0
 
 ### Added
